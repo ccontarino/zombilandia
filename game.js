@@ -1,7 +1,7 @@
 "use strict";
 // Zombilandia: platformer de zombies en canvas, sin librerías. Personajes y arte propios (rects de píxel).
 // 5 niveles: cementerio, ciudad en ruinas, pantano tóxico, laboratorio y la guarida del Rey Zombi (jefe final).
-const VERSION = "v55"; // subir en cada publicación (también en index.html)
+const VERSION = "v56"; // subir en cada publicación (también en index.html)
 // ---------- Métricas de uso (Umami, anónimas, sin cookies) ----------
 // Pegá acá el "Website ID" de tu sitio en Umami; vacío = no se manda nada. Respeta "No rastrear" del navegador y solo cuenta en el sitio publicado.
 const UMAMI = { id: "4c40559c-a7e6-4a1f-8fb1-6d289f3ffbcb", src: "https://cloud.umami.is/script.js", domains: "ccontarino.github.io" };
@@ -245,7 +245,7 @@ function mkPlayer(i, k) {
   return { x, y: 150, vx: 0, vy: 0, w: 10, h: 14, face: 1, ground: false, coyote: 0, jumps: 0, cd: 0, beam: 0, beamDir: 1, ray: null, firePrev: false, shot: 0, inv: 0, dead: 0, step: 0, springT: 0, big: false, tier: 0, want: keep, growing: keep > 0, power: keep > 0 ? 1 : 0, beamBig: false, beamTier: 0, shield: !!k?.shield, hero: i === 0 ? hero : (net.ghero ?? 1 - hero), skin: i === 0 ? (CFG.skin || 0) : (net.gskin || 0), safe: { x, y: 150 } };
 }
 // Punto de control: a mitad del nivel. Si te comen después de pasarlo, reintentás desde ahí.
-const cpGot = {}; let cpMemo = null;
+const cpGot = {}; let cpMemo = null, rings = []; // rings: ondas de choque de las explosiones
 function cpInfo() {
   if (endless || L?.custom || mode === "edit") return null;
   const key = levelIdx + "|" + goalX + "|" + (map ? map[13]?.join("").length : 0); if (cpMemo && cpMemo.key === key) return cpMemo.v;
@@ -274,7 +274,7 @@ function loadLevel(i) {
   totalBrains = items.length + map.reduce((n, row) => n + row.filter((c) => c === "?").length, 0); gotBrains = 0; levelTime = 0; damaged = false;
   deco = []; addDeco(4, goalX - 3, levelIdx);
   { const cp = !endless && cpGot[levelIdx] && !L.custom ? cpInfo() : null; if (cp) { players.forEach((p, k) => { p.x = cp.c * T + k * 12; p.y = cp.r * T - p.h; }); } cam = cp ? Math.max(0, cp.c * T - 120) : 0; }
-  parts = []; shots = []; shake = 0; msg = ""; msgT = 0; banner = 160; bossDead = false; arenaLocked = false; levelStart = score;
+  parts = []; rings = []; shots = []; shake = 0; msg = ""; msgT = 0; banner = 160; bossDead = false; arenaLocked = false; levelStart = score;
   if (!custom && i + 1 > unlocked) { unlocked = i + 1; try { localStorage.setItem("zombilandia-nivel", unlocked); } catch {} }
 }
 function lockArena() { arenaLocked = true; fill(arena.wall, arena.wall + 1, 2, surface(arena.wall) - 1, "#"); shake = 20; beep(90, .8, "sawtooth", 40); }
@@ -650,7 +650,7 @@ function updateZombie(z) {
     if (z.fuse) {
       z.vx = 0; if (z.fuse % 8 === 0) beep(900 + (45 - z.fuse) * 12, .05, "square", 0);
       if (--z.fuse === 0) { // explota: lastima a quien esté cerca, incluso a otros zombis
-        z.dead = 1; shake = 16; vibe([60, 40, 120]); burst(z.x + 6, z.y + 7, "#ff9a30", 26, 5); burst(z.x + 6, z.y + 7, "#ffe080", 14, 3); beep(70, .5, "sawtooth", 40);
+        z.dead = 1; shake = 16; rings.push({ x: z.x + 6, y: z.y + 7, r: 4, life: 20 }); vibe([60, 40, 120]); burst(z.x + 6, z.y + 7, "#ff9a30", 26, 5); burst(z.x + 6, z.y + 7, "#ffe080", 14, 3); beep(70, .5, "sawtooth", 40);
         for (let i = 0; i < players.length; i++) { const q = players[i]; if (!q.dead && Math.hypot(q.x + q.w / 2 - z.x - 6, q.y + q.h / 2 - z.y - 7) < 36) { ctx(i); hurt(z); } } ctx(0);
         for (const m of zombies) if (m !== z && !m.dead && Math.hypot(m.x - z.x, m.y - z.y) < 40) damage(m, 2);
         return;
@@ -823,6 +823,7 @@ function update() {
     if (mode === "won") { recordScore(); track("juego_terminado", { puntos: score }); }
   }
   for (const q of parts) { q.x += q.vx; q.y += q.vy; q.vy += .15; q.life--; }
+  for (const q of rings) { q.r += 2.6; q.life--; } rings = rings.filter((q) => q.life > 0);
   parts = parts.filter((q) => q.life > 0);
   if (endless && players.some((q) => q.x > 140 * T)) shiftWorld();
   cam = Math.max(0, Math.min(COLS * T - W, players[0].x - W / 2 + 20));
@@ -947,10 +948,11 @@ const AMB = {
 };
 Object.assign(MID, {
   peaks() {
+    for (let k = 0; k < 3; k++) { g.beginPath(); g.moveTo(0, 0); for (let x = 0; x <= W; x += 12) g.lineTo(x, 34 + k * 14 + Math.sin(x * .02 + time * .01 + k * 2 - cam * .001) * 10); g.lineTo(W, 0); g.closePath(); g.fillStyle = vgrad(g, 0, 70, [[0, "rgba(90,255,180,0)"], [.7, k % 2 ? "rgba(120,140,255,.14)" : "rgba(90,255,180,.16)"], [1, "rgba(90,255,180,0)"]]); g.fill(); }
     layer(.3, 170, (x, i) => {
       const h = 80 + Math.round(rnd(i) * 60), w = 120 + Math.round(rnd(i + 3) * 50), b = 212, px = x + w * .45;
-      g.fillStyle = "#26345a"; g.beginPath(); g.moveTo(x, b); g.lineTo(px, b - h); g.lineTo(x + w * .62, b - h + 12); g.lineTo(x + w, b); g.fill();
-      g.fillStyle = "#1a2444"; g.beginPath(); g.moveTo(px, b - h); g.lineTo(x + w * .62, b - h + 12); g.lineTo(x + w, b); g.lineTo(x + w * .55, b); g.fill();
+      g.fillStyle = "#3c4e84"; g.beginPath(); g.moveTo(x, b); g.lineTo(px, b - h); g.lineTo(x + w * .62, b - h + 12); g.lineTo(x + w, b); g.fill();
+      g.fillStyle = "#2a3a68"; g.beginPath(); g.moveTo(px, b - h); g.lineTo(x + w * .62, b - h + 12); g.lineTo(x + w, b); g.lineTo(x + w * .55, b); g.fill();
       g.fillStyle = "#e4eeff"; g.beginPath(); g.moveTo(px, b - h); g.lineTo(px - 14, b - h + 24); g.lineTo(px - 6, b - h + 20); g.lineTo(px + 2, b - h + 30); g.lineTo(px + 10, b - h + 18); g.lineTo(x + w * .62, b - h + 12); g.fill();
     });
   },
@@ -1013,7 +1015,9 @@ Object.assign(AMB, {
   snow() { for (let i = 0; i < 60; i++) { const y = (rnd(i + 3) * H + time * (.5 + rnd(i) * .6)) % H, x = ((rnd(i) * W + Math.sin(time * .02 + i) * 14 - cam * .5 - time * .15) % W + W) % W; g.globalAlpha = .55 + rnd(i + 9) * .4; R(x, y, 1 + (i % 3 === 0), 1 + (i % 3 === 0), "#f4faff"); } g.globalAlpha = 1; },
   sand() { for (let i = 0; i < 40; i++) { const y = 20 + rnd(i + 3) * 190, x = ((rnd(i) * W * 1.5 - time * (1.2 + rnd(i + 1) * 1.4) - cam * .4) % W + W) % W; g.globalAlpha = .22 + rnd(i + 5) * .2; R(x, y, 6 + (i % 5) * 3, 1, "#ffe0a0"); } g.globalAlpha = 1; },
   spores() { for (let i = 0; i < 34; i++) { const x = ((rnd(i) * W * 2 - cam * .7 + Math.sin(time * .01 + i) * 20) % W + W) % W, y = 40 + ((rnd(i + 1) * 170 - time * (.15 + rnd(i + 4) * .25)) % 170 + 170) % 170, a = (Math.sin(time * .05 + i * 3) + 1) / 2; glow(x, y, 6, i % 3 ? "#9aff6a" : "#ff9ae8", a * .5); R(x, y, 1, 1, "#f0ffd0"); } },
-  confetti() { for (let i = 0; i < 46; i++) { const y = (rnd(i + 3) * H + time * (.4 + rnd(i) * .5)) % H, x = ((rnd(i) * W + Math.sin(time * .04 + i) * 10 - cam * .4) % W + W) % W; g.globalAlpha = .8; R(x, y, 2, 2, ["#ff5a8a", "#ffcc33", "#5ae0ff", "#9aff6a"][i % 4]); } g.globalAlpha = 1; },
+  confetti() {
+    for (let j = 0; j < 3; j++) { const t0 = time + j * 53, ph = t0 % 160, n = Math.floor(t0 / 160) + j * 7, bx = 60 + rnd(n) * (W - 120), by = 40 + rnd(n + 3) * 60, col = ["#ff5a8a", "#ffcc33", "#5ae0ff", "#9aff6a"][n % 4];
+      if (ph < 50) { const r = ph * 1.1; g.globalAlpha = 1 - ph / 50; for (let k = 0; k < 14; k++) { const a = k * .449; R(bx + Math.cos(a) * r, by + Math.sin(a) * r + ph * .12, 1.5, 1.5, col); } g.globalAlpha = 1; } } for (let i = 0; i < 46; i++) { const y = (rnd(i + 3) * H + time * (.4 + rnd(i) * .5)) % H, x = ((rnd(i) * W + Math.sin(time * .04 + i) * 10 - cam * .4) % W + W) % W; g.globalAlpha = .8; R(x, y, 2, 2, ["#ff5a8a", "#ffcc33", "#5ae0ff", "#9aff6a"][i % 4]); } g.globalAlpha = 1; },
   stardust() { for (let i = 0; i < 30; i++) { const x = ((rnd(i) * W - cam * .5) % W + W) % W, y = 30 + rnd(i + 1) * 170, a = (Math.sin(time * .06 + i * 2) + 1) / 2; g.globalAlpha = a * .8; R(x, y, 1, 1, "#cfe0ff"); } g.globalAlpha = 1; },
 });
 function drawLab() {
@@ -1624,6 +1628,7 @@ function draw() {
     if (s.kind === "fire") { g.globalAlpha = .35; R(x - 4, s.y - 4, 8, 8, "#ff5a10"); g.globalAlpha = 1; R(x - 2, s.y - 2, 4, 4, s.col); R(x - 1, s.y - 1, 2, 2, "#fff0a0"); continue; }
     g.globalAlpha = .3; g.fillStyle = s.col; g.beginPath(); g.arc(x, s.y, s.r + 3, 0, 7); g.fill(); g.globalAlpha = 1; g.beginPath(); g.arc(x, s.y, s.r, 0, 7); g.fill(); R(x - 1, s.y - 2, 1, 1, "#f0ffc0"); }
   for (const q of players) { drawPlayer(q); drawShield(q); drawBeam(q); } drawWater();
+  for (const q of rings) { g.globalAlpha = q.life / 24; g.strokeStyle = "#ffe0a0"; g.lineWidth = 2.2 * q.life / 20; g.beginPath(); g.arc(q.x - cam, q.y, q.r, 0, 7); g.stroke(); g.strokeStyle = "rgba(255,120,40,.7)"; g.lineWidth = 1; g.beginPath(); g.arc(q.x - cam, q.y, q.r * .78, 0, 7); g.stroke(); } g.globalAlpha = 1;
   for (const q of parts) { const a = Math.min(1, q.life / 20); g.globalAlpha = a; g.fillStyle = q.col; g.beginPath(); g.arc(q.x - cam, q.y, 1 + a * .9, 0, 7); g.fill(); } g.globalAlpha = 1;
   if (fxLvl > 0) drawLights(); if (fxLvl > 1) postFX();
   g.fillStyle = grads().vig; g.fillRect(0, 0, W, H);
