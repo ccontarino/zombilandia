@@ -77,7 +77,7 @@ const DEFAULT_RELAY = "wss://zombilandia.ccontarino.workers.dev"; // dirección 
   function hostStep() {
     net.paused = mode === "play" && players.length > 1 && !net.peer;
     if (net.peer && performance.now() - lastRx > 8000) peerGone("Sin señal del invitado");
-    if (net.peer && tickN % (mode === "play" ? 3 : 6) === 0) sendSnap();
+    if (net.peer && tickN % (mode === "play" ? 2 : 6) === 0) sendSnap();
   }
   function peerGone(why) {
     net.peer = false; net.rec = null; keys2.left = keys2.right = keys2.jump = keys2.fire = false; note = why || "";
@@ -120,7 +120,7 @@ const DEFAULT_RELAY = "wss://zombilandia.ccontarino.workers.dev"; // dirección 
     const old = new Map(zombies.map((z) => [z.uid, z]));
     zombies = m.z.map((a) => unpackZ(a, old.get(a[0])));
     shots = m.sh.map(([x, y, r, col, kind]) => ({ x, y, r, col, kind: kind || undefined }));
-    m.mv.forEach(([x, y], i) => { const o = movers[i]; if (o) { if (o.tx !== undefined) { o.vx = (x - o.tx) / 3; o.vy = (y - o.ty) / 3; } o.tx = x; o.ty = y; } });
+    m.mv.forEach(([x, y], i) => { const o = movers[i]; if (o) { if (o.tx !== undefined) { o.vx = (x - o.tx) / 2; o.vy = (y - o.ty) / 2; } o.tx = x; o.ty = y; } });
     falling = m.fl.map(([x, y]) => ({ x, y, vy: 0 })); crumble = {}; for (const k of m.cr) crumble[k] = 1;
     levelTime = m.lt; banner = m.bn; if (m.sk > shake) shake = m.sk;
     if (m.ig) for (const i of m.ig) if (items[i]) items[i].got = true;
@@ -150,6 +150,11 @@ const DEFAULT_RELAY = "wss://zombilandia.ccontarino.workers.dev"; // dirección 
     if (mode === "play" && (sig !== lastSig || tj || tf || tickN % 30 === 0)) { send({ t: "i", l: +k.left, r: +k.right, j: +k.jump, f: +k.fire, tj: +tj, tf: +tf }); lastSig = sig; }
     else if (mode !== "play" && tickN % 30 === 0) send({ t: "i", l: 0, r: 0, j: 0, f: 0 }); // señal de vida
     if (tickN % 60 === 0) send({ t: "ping", ts: performance.now() });
+    if (mode === "play") { // extrapolación: avanzo el destino con la velocidad conocida para que no se vea atrasado entre paquetes
+      for (const q of players) if (q.tx !== undefined && !q.pred && !q.dead) { q.tx += q.vx; if (!q.ground) { q.vy = Math.min(q.vy + .28, 6.5); q.ty += q.vy; } }
+      for (const z of zombies) if (z.tx !== undefined && !z.dead && !z.frozen) z.tx += z.vx;
+      for (const m of movers) if (m.tx !== undefined) { m.tx += m.vx; m.ty += m.vy; }
+    }
     for (const q of players) if (q.tx !== undefined && !(q.pred && mode === "play")) { q.x += (q.tx - q.x) * .4; q.y += (q.ty - q.y) * .4; }
     for (const z of zombies) if (z.tx !== undefined) { z.x += (z.tx - z.x) * .4; z.y += (z.ty - z.y) * .4; }
     for (const m of movers) if (m.tx !== undefined) { m.x += (m.tx - m.x) * .4; m.y += (m.ty - m.y) * .4; }
