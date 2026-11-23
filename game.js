@@ -1,7 +1,7 @@
 "use strict";
 // Zombilandia: platformer de zombies en canvas, sin librerías. Personajes y arte propios (rects de píxel).
 // 5 niveles: cementerio, ciudad en ruinas, pantano tóxico, laboratorio y la guarida del Rey Zombi (jefe final).
-const VERSION = "v31"; // subir en cada publicación (también en index.html)
+const VERSION = "v32"; // subir en cada publicación (también en index.html)
 const T = 16, H = 240, ROWS = 15, COLS = 215;
 let W = 480, cache = {};
 const cv = document.getElementById("c"), g = cv.getContext("2d");
@@ -1151,7 +1151,7 @@ function drawBeam(p) {
 function heart(x, y, c) { R(x + 1, y, 2, 1, c); R(x + 4, y, 2, 1, c); R(x, y + 1, 7, 2, c); R(x + 1, y + 3, 5, 1, c); R(x + 2, y + 4, 3, 1, c); R(x + 3, y + 5, 1, 1, c); }
 const text = (s, x, y, c = "#f3efe6") => { g.fillStyle = "#000"; g.fillText(s, x + 1, y + 1); g.fillStyle = c; g.fillText(s, x, y); };
 function hud() {
-  g.globalAlpha = .55; R(0, 0, W, 28, "#07051a"); g.globalAlpha = 1; R(0, 28, W, 1, "#2e2152");
+  { const hg = g.createLinearGradient(0, 0, 0, 29); hg.addColorStop(0, "rgba(7,5,26,.85)"); hg.addColorStop(1, "rgba(7,5,26,.35)"); g.fillStyle = hg; g.fillRect(0, 0, W, 29); const ln = g.createLinearGradient(0, 0, W, 0); ln.addColorStop(0, "rgba(124,196,86,0)"); ln.addColorStop(.5, "rgba(124,196,86,.55)"); ln.addColorStop(1, "rgba(124,196,86,0)"); g.fillStyle = ln; g.fillRect(0, 28, W, 1); }
   g.font = "bold 10px ui-monospace, monospace"; g.textBaseline = "top"; g.textAlign = "left";
   let n = Math.min(6, Math.max(lives, 3)); for (let i = 0; i < n; i++) heart(8 + i * 9, 5, i < lives ? "#ff5a5a" : "#3a2a4a");
   if (player.shield) { g.strokeStyle = "#bfefff"; g.lineWidth = 1; g.beginPath(); g.arc(8 + n * 9 + 4, 8, 3.5, 0, 7); g.stroke(); n++; }
@@ -1160,20 +1160,20 @@ function hud() {
   if (endless) { g.textAlign = "right"; text(`${meters()} m`, W - 8, 3, "#7cc456"); g.textAlign = "left"; }
   else {
     text("N" + (levelIdx + 1), W - 72, 3, "#cfc8e8");
-    const pct = Math.min(1, player.x / (goalX * T)); R(W - 52, 6, 40, 4, "#2e2152"); R(W - 52, 6, Math.round(40 * pct), 4, "#7cc456"); R(W - 10, 3, 1, 9, "#cfc8e8"); R(W - 9, 3, 5, 4, "#d6453d");
+    const pct = Math.min(1, player.x / (goalX * T)); rr(W - 52, 6, 40, 4, 2, "#2e2152"); rr(W - 52, 6, Math.max(2, Math.round(40 * pct)), 4, 2, "#7cc456"); R(W - 10, 3, 1, 9, "#cfc8e8"); R(W - 9, 3, 5, 4, "#d6453d");
   }
   text(clock(levelTime), W - 40, 15, levelTime / 60 > PAR[levelIdx] ? "#ff8a7a" : "#cfc8e8");
-  text("RAYO", 8, 15, "#7ff5ff"); R(36, 18, 40, 4, "#1d3a4a"); R(36, 18, Math.round(40 * (1 - player.cd / 40)), 4, player.cd ? "#3fd9ff" : "#bff8ff");
+  text("RAYO", 8, 15, "#7ff5ff"); rr(36, 18, 40, 4, 2, "#12303c"); rr(36, 18, Math.max(2, Math.round(40 * (1 - player.cd / 40))), 4, 2, player.cd ? "#3fd9ff" : "#bff8ff");
   if (player.power > 0) text(Math.max(player.tier, player.want) === 2 ? "BESTIA x2" : "BESTIA", 84, 15, Math.sin(time * .15) > 0 ? "#ffb03a" : "#ff7a1a");
   const boss = arenaLocked && zombies.find((z) => isBoss(z) && !z.dead);
   if (boss) {
-    const k = ZT[boss.type]; g.textAlign = "center"; text(k.boss, W / 2, 33, "#e8b830"); R(W / 2 - 60, 45, 120, 5, "#2a0a0a"); R(W / 2 - 60, 45, Math.round(120 * boss.hp / k.hp), 5, "#e02a4a"); R(W / 2 - 60, 45, Math.round(120 * boss.hp / k.hp), 1, "#ff8a9a");
+    const k = ZT[boss.type]; g.textAlign = "center"; text(k.boss, W / 2, 33, "#e8b830"); rr(W / 2 - 60, 45, 120, 5, 2.5, "#2a0a0a"); rr(W / 2 - 60, 45, Math.max(2, Math.round(120 * boss.hp / k.hp)), 5, 2.5, "#e02a4a"); R(W / 2 - 60, 45, Math.round(120 * boss.hp / k.hp), 1, "#ff8a9a");
     if (boss.glass > 0) for (let j = 0; j < 3; j++) R(W / 2 - 60 + j * 14, 52, 12, 3, j < boss.glass ? "#bfefff" : "#2a3a4a");
     g.textAlign = "left";
   }
   if (msgT) { g.textAlign = "center"; text(msg, W / 2, 60, "#f2c94c"); g.textAlign = "left"; }
   if (banner && mode === "play") {
-    const a = Math.min(1, banner / 30, (160 - banner) / 20); g.globalAlpha = a * .7; R(0, 88, W, 50, "#07051a"); g.globalAlpha = a;
+    const a = Math.min(1, banner / 30, (160 - banner) / 20); { const bg = g.createLinearGradient(0, 80, 0, 146); bg.addColorStop(0, "rgba(7,5,26,0)"); bg.addColorStop(.25, "rgba(7,5,26,.8)"); bg.addColorStop(.75, "rgba(7,5,26,.8)"); bg.addColorStop(1, "rgba(7,5,26,0)"); g.globalAlpha = a; g.fillStyle = bg; g.fillRect(0, 80, W, 66); } g.globalAlpha = a * .0; g.globalAlpha = a;
     g.textAlign = "center"; g.font = "10px ui-monospace, monospace"; text(endless ? `RÉCORD: ${endBest} METROS` : `NIVEL ${levelIdx + 1} DE ${LEVELS.length}`, W / 2, 95, "#cfc8e8");
     g.font = "bold 16px ui-monospace, monospace"; text(L.name.toUpperCase(), W / 2, 111, levelIdx === 4 ? "#ff6a4a" : "#7cc456");
     g.globalAlpha = 1; g.textAlign = "left";
@@ -1195,7 +1195,7 @@ function drawTitle() {
   g.font = "11px ui-monospace, monospace"; g.fillStyle = "#cfc8e8"; g.fillText("Saltá, disparale y llegá a la bandera.", W / 2, 70);
   titleBoxes().forEach((b, i) => {
     const open = titleOpen(i), on = i === sel, best = bests[i];
-    R(b.x, b.y, b.w, b.h, on ? "#3b2f60" : "#1d1730"); g.strokeStyle = on ? "#f2c94c" : open ? "#4a3e6b" : "#2a2240"; g.lineWidth = on ? 2 : 1; g.strokeRect(b.x + .5, b.y + .5, b.w - 1, b.h - 1);
+    rr(b.x, b.y, b.w, b.h, 5, on ? "#3b2f60" : "#1d1730"); g.strokeStyle = on ? "#f2c94c" : open ? "#4a3e6b" : "#2a2240"; g.lineWidth = on ? 2 : 1; g.beginPath(); g.roundRect ? g.roundRect(b.x + .5, b.y + .5, b.w - 1, b.h - 1, 5) : g.rect(b.x + .5, b.y + .5, b.w - 1, b.h - 1); g.stroke(); if (on) glow(b.x + b.w / 2, b.y + b.h / 2, 34, "#f2c94c", .35);
     g.font = "bold 16px ui-monospace, monospace"; g.fillStyle = open ? (i === 4 ? "#ff6a4a" : "#f3efe6") : "#4a3e6b"; g.fillText(i === 5 ? "∞" : open ? String(i + 1) : "×", b.x + b.w / 2, b.y + 22);
     if (open && i < 5) for (let k = 0; k < 3; k++) star(b.x + 6 + k * 10, b.y + 29, best && best.st > k);
     if (i === 5) { g.font = "9px ui-monospace, monospace"; g.fillStyle = "#7cc456"; g.fillText(endBest ? `${endBest}m` : "nuevo", b.x + b.w / 2, b.y + 35); }
@@ -1301,12 +1301,48 @@ function buildEdUI() {
   document.getElementById("edExit").onclick = () => { saveEd(); showEd(false); mode = "title"; loadLevel(0); };
   const eb = document.getElementById("edit"); if (eb) eb.onclick = () => { if (mode === "title" && !net.role) enterEditor(edData); };
 }
+// ---------- Efectos modernos: luces, sombras, partículas de ambiente, HUD de vidrio ----------
+const glowCache = {};
+function glow(x, y, r, col, a = .5) { // resplandor aditivo (la luz se suma sobre la escena)
+  if (typeof col !== "string" || !/^#[0-9a-f]{6}$/i.test(col)) return;
+  let c = glowCache[col];
+  if (!c) { c = document.createElement("canvas"); c.width = c.height = 64; const k = c.getContext("2d"), gr = k.createRadialGradient(32, 32, 0, 32, 32, 32); gr.addColorStop(0, col); gr.addColorStop(.4, hexA(col, .35)); gr.addColorStop(1, hexA(col, 0)); k.fillStyle = gr; k.fillRect(0, 0, 64, 64); glowCache[col] = c; }
+  g.save(); g.globalCompositeOperation = "lighter"; g.globalAlpha = a; g.drawImage(c, x - r, y - r, r * 2, r * 2); g.restore();
+}
+function rr(x, y, w, h, r, c) { g.fillStyle = c; g.beginPath(); g.roundRect ? g.roundRect(x, y, w, h, r) : g.rect(x, y, w, h); g.fill(); }
+function shadowOf(e) { if (!e.ground || e.dead) return; g.globalAlpha = .28; g.fillStyle = "#000"; g.beginPath(); g.ellipse(Math.round(e.x - cam + e.w / 2), Math.round(e.y + e.h) + 1, e.w * .55, 2, 0, 0, 7); g.fill(); g.globalAlpha = 1; }
+const MOTE = { cemetery: ["#b8ff9a", 1], city: ["#c8c0b0", 0], swamp: ["#9aff6a", 1], lab: ["#7ff5ff", 1], lair: ["#ff8a3a", 2] };
+function drawMotes() { // luciérnagas, polvo o brasas flotando con parallax
+  const [col, kind] = MOTE[L.theme] || MOTE.cemetery;
+  for (let i = 0; i < 26; i++) {
+    const sp = .25 + (i % 5) * .12, ox = i * 73.7, oy = (i * 41.3) % 150;
+    let x = ((ox - cam * sp * 1.4 + time * (kind === 2 ? .1 : .18) * (i % 2 ? 1 : -1)) % (W + 20) + W + 20) % (W + 20) - 10;
+    let y = 40 + oy + Math.sin(time * .02 + i) * 8 - (kind === 2 ? (time * .3 + i * 20) % 120 : 0);
+    if (y < 30) y += 120;
+    const a = (kind === 1 ? .35 + .35 * Math.sin(time * .05 + i * 2) : .35);
+    glow(x, y, kind === 0 ? 3 : 5, col, Math.max(0, a) * .8);
+    if (kind !== 0) { g.globalAlpha = Math.max(0, a); R(x, y, 1, 1, "#fff"); g.globalAlpha = 1; }
+  }
+}
+function drawLights() { // se llama después de dibujar todo, antes de la viñeta
+  for (const it of items) if (!it.got) glow(it.x - cam + 4, it.y + 4, 13, it.kind ? "#ffd860" : "#ff7aa8", .45 + .15 * Math.sin(time * .08 + it.x));
+  for (const s of shots) if (s.kind !== "tomb") glow(s.x - cam, s.y, (s.r || 3) * 4.5, s.kind === "fire" ? "#ff7a1a" : s.col, .6);
+  for (const p of players) {
+    if (p.dead) continue;
+    if (p.ray) glow(p.ray.x - cam + p.ray.w / 2, p.ray.y + p.ray.h / 2, Math.max(10, p.ray.h * 3), p.hero === 1 ? "#7fb8ff" : "#7ff5ff", .5);
+    if (p.power > 0) glow(p.x - cam + p.w / 2, p.y + p.h / 2, 22 + p.tier * 8, "#ff8a1a", .35 + .1 * Math.sin(time * .2));
+    glow(p.x - cam + p.w / 2, p.y + p.h * .35, 8, p.hero === 1 ? "#9ad0ff" : "#7ff5ff", .18);
+  }
+  for (const z of zombies) if (!z.dead && z.type && isBoss(z)) glow(z.x - cam + z.w / 2, z.y + z.h * .3, 26, "#ff3a2a", .22);
+  for (const q of parts) glow(q.x - cam, q.y, 5, q.col, Math.min(.6, q.life / 40));
+}
 function draw() {
   if (mode === "edit") { drawEditor(); return; }
   player = players[me()] || players[0];
   g.save();
   if (shake) g.translate(Math.round((Math.random() - .5) * 4), Math.round((Math.random() - .5) * 4));
-  drawBg(); drawTiles(); drawItems();
+  drawBg(); drawMotes(); drawTiles(); drawItems();
+  for (const z of zombies) shadowOf(z); for (const q of players) shadowOf(q);
   for (const f of falling) drawPlat(f.x - cam, f.y, -9, 0, .3);
   for (const m of movers) { // plataformas móviles
     const x = Math.round(m.x - cam), y = Math.round(m.y), [p0, p1, p2] = TH.plat;
@@ -1322,6 +1358,7 @@ function draw() {
     g.globalAlpha = .3; g.fillStyle = s.col; g.beginPath(); g.arc(x, s.y, s.r + 3, 0, 7); g.fill(); g.globalAlpha = 1; g.beginPath(); g.arc(x, s.y, s.r, 0, 7); g.fill(); R(x - 1, s.y - 2, 1, 1, "#f0ffc0"); }
   for (const q of players) { drawPlayer(q); drawShield(q); drawBeam(q); } drawWater();
   for (const q of parts) { g.globalAlpha = Math.min(1, q.life / 20); R(q.x - cam, q.y, 2, 2, q.col); } g.globalAlpha = 1;
+  drawLights();
   g.fillStyle = grads().vig; g.fillRect(0, 0, W, H);
   hud(); g.restore();
   g.font = "8px ui-monospace, monospace"; g.textAlign = "right"; g.textBaseline = "bottom"; g.globalAlpha = .6; text(VERSION, W - 3, H - 2, "#cfc8e8"); g.globalAlpha = 1; g.textAlign = "left";
