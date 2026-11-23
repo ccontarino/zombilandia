@@ -203,7 +203,7 @@ const DEFAULT_RELAY = "wss://zombilandia.ccontarino.workers.dev"; // dirección 
     try { sock = new WebSocket(`${RELAY.replace(/\/$/, "")}/sala/${c}?rol=${role}`); } catch { fail("No se pudo conectar."); return; }
     ws = sock;
     sock.onopen = () => {
-      opened = true; retry = 0; lastRx = performance.now(); note = ""; lock();
+      opened = true; retry = 0; lastRx = performance.now(); note = ""; lock(); try { localStorage.setItem("zombilandia-sala", JSON.stringify({ role, code: c, t: Date.now() })); } catch {}
       if (role === "guest") { net.peer = true; nPlayers = 2; if (!gotSnap) { mode = "title"; loadLevel(0); } send({ t: "hi", skin: CFG.skin || 0 }); setMsg(`Conectado a la sala ${c}. Esperando al anfitrión…`); showOn(false); }
       else { $("onMenu").hidden = true; $("onSala").hidden = false; $("onCode").textContent = c; $("onLink").value = shareLink(c); setMsg("Mandale el link a tu amigo y esperá a que entre."); }
     };
@@ -219,7 +219,7 @@ const DEFAULT_RELAY = "wss://zombilandia.ccontarino.workers.dev"; // dirección 
     sock.onerror = () => {};
   }
   function fail(msg) { net.role = null; net.peer = false; ws = null; showOn(true); $("onMenu").hidden = false; $("onSala").hidden = true; setMsg(msg); }
-  function leave() { net.joining = false;
+  function leave() { net.joining = false; try { localStorage.removeItem("zombilandia-sala"); } catch {}
     closing = true; const was = net.role; try { ws?.close(); } catch {} ws = null;
     net.role = null; net.peer = false; net.paused = false; net.rec = null; note = ""; gotSnap = false;
     for (const k of ["left", "right", "jump", "fire"]) keys2[k] = false;
@@ -237,7 +237,12 @@ const DEFAULT_RELAY = "wss://zombilandia.ccontarino.workers.dev"; // dirección 
   // ---------- Pantalla de salas ----------
   const shareLink = (c) => `${location.origin}${location.pathname}?sala=${c}${qp.get("relay") ? "&relay=" + encodeURIComponent(qp.get("relay")) : ""}`;
   function setMsg(t) { const e = $("onMsg"); if (e) e.textContent = t; }
-  function showOn(v) { const d = $("on"); if (d) d.hidden = !v; }
+  function showOn(v) {
+    const d = $("on"); if (d) d.hidden = !v;
+    const b = $("onResume"); if (!b) return;
+    let s = null; try { s = JSON.parse(localStorage.getItem("zombilandia-sala") || "null"); } catch {}
+    if (v && s && !net.role && Date.now() - s.t < 20 * 60 * 1000) { b.hidden = false; b.textContent = `Volver a la sala ${s.code}`; b.onclick = () => { setMsg("Conectando…"); connect(s.role, s.code); }; } else b.hidden = true;
+  }
   function openOn() {
     showOn(true); const conectado = !!net.role;
     $("onMenu").hidden = conectado; $("onSala").hidden = !(conectado && net.role === "host"); $("onLeave").hidden = !conectado;

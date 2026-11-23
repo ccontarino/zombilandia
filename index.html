@@ -61,6 +61,8 @@
   #on input { width:100%; font:700 18px ui-monospace, monospace; text-align:center; text-transform:uppercase; background:#07051a; color:var(--ink); border:1px solid #4a3e6b; border-radius:6px; padding:8px; }
   #on #onLink { font:11px ui-monospace, monospace; text-transform:none; }
   #on button { margin:8px 4px 0; font:700 14px ui-monospace, monospace; padding:10px 14px; background:#251d3d; color:var(--ink); border:1px solid #4a3e6b; border-radius:6px; }
+  #on #onResume { background:#6a4a10; border-color:#f2c94c; display:block; width:100%; }
+  #on #onResume[hidden] { display:none; }
   #on #onCrear, #on #onUnir { background:#3d6a2a; border-color:#7cc456; }
   #on button[hidden], #on div[hidden] { display:none; }
   #ed { display:none; width:100%; max-width:960px; padding:6px 8px 0; }
@@ -81,7 +83,7 @@
 <div id="nm" hidden><div><p>¡Nuevo récord! Tus iniciales:</p><input id="nmIn" maxlength="3" autocomplete="off" autocapitalize="characters" spellcheck="false"><button id="nmOk">Guardar</button></div></div>
 <div id="on" hidden><div>
   <p>Jugar online (2 jugadores)</p>
-  <div id="onMenu"><button id="onCrear">Crear sala</button><div class="or">o entrá con un código</div><input id="onCod" maxlength="4" placeholder="ABCD" autocomplete="off" autocapitalize="characters" spellcheck="false"><button id="onUnir">Unirme</button></div>
+  <div id="onMenu"><button id="onResume" hidden></button><button id="onCrear">Crear sala</button><div class="or">o entrá con un código</div><input id="onCod" maxlength="4" placeholder="ABCD" autocomplete="off" autocapitalize="characters" spellcheck="false"><button id="onUnir">Unirme</button></div>
   <div id="onSala" hidden><div class="cod" id="onCode"></div><input id="onLink" readonly><button id="onCopy">Copiar link</button><button id="onShare" hidden>Compartir</button></div>
   <div id="onMsg" class="msg"></div>
   <button id="onLeave" hidden>Salir de la sala</button><button id="onClose">Cerrar</button>
@@ -107,10 +109,10 @@
   <div class="msg" id="cfgMsg"></div>
   <div id="cfgAch"></div>
   <div class="acts"><button id="cfgMenu">Volver al menú</button><button id="cfgClose">Seguir</button></div></div></div>
-<script src="art.js?v=42"></script>
-<script src="chars.js?v=42"></script>
-<script src="game.js?v=42"></script>
-<script src="net.js?v=42"></script>
-<script>if ("serviceWorker" in navigator && (location.protocol === "https:" || location.hostname === "localhost")) navigator.serviceWorker.register("sw.js?v=42").catch(() => {});</script>
+<script src="art.js?v=43"></script>
+<script src="chars.js?v=43"></script>
+<script src="game.js?v=43"></script>
+<script src="net.js?v=43"></script>
+<script>if ("serviceWorker" in navigator && (location.protocol === "https:" || location.hostname === "localhost")) navigator.serviceWorker.register("sw.js?v=43").catch(() => {});</script>
 </body>
 </html>
