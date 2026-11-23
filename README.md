@@ -25,3 +25,11 @@ Platformer de zombies para el navegador, hecho con canvas y sin librerías. Pers
 - **Reglas:** saltale encima a los zombis para eliminarlos, juntá cerebros (son la moneda de la tienda), abrí los bloques `?` pegándoles desde abajo y llegá a la bandera.
 
 Para probarlo en local: abrí `index.html` o corré `python3 -m http.server`.
+
+## Dos jugadores online
+
+Tocá 👥, creá una sala y mandale el link (`?sala=ABCD`) a tu amigo, que entra desde su celu. Vos sos Chispa y él Escarcha; las vidas, los cerebros y los puntos son de los dos. Los dos tienen que llegar a un mismo mundo: si uno se queda muy atrás, el otro lo trae.
+
+- El anfitrión corre todo el juego y manda el estado ~20 veces por segundo; el invitado manda sus botones y dibuja (`net.js`). Gasta unos 30 MB por hora.
+- Si se corta uno, la partida se pausa y sigue cuando vuelve (o tocás para seguir solo).
+- Los dos se conectan a un relé en Cloudflare Workers (`relay/`): solo reenvía mensajes. Para desplegarlo: `cd relay && npx wrangler deploy`, y poner la dirección en `DEFAULT_RELAY` de `net.js`. Para probar sin Cloudflare: `node relay/dev.js` (necesita `npm i ws`) y abrir el juego con `?relay=ws://localhost:8787`.
