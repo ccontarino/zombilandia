@@ -1,7 +1,7 @@
 "use strict";
 // Zombilandia: platformer de zombies en canvas, sin librerías. Personajes y arte propios (rects de píxel).
 // 5 niveles: cementerio, ciudad en ruinas, pantano tóxico, laboratorio y la guarida del Rey Zombi (jefe final).
-const VERSION = "v44"; // subir en cada publicación (también en index.html)
+const VERSION = "v45"; // subir en cada publicación (también en index.html)
 const T = 16, H = 240, ROWS = 15, COLS = 215;
 let W = 480, cache = {};
 const cv = document.getElementById("c"); let g = cv.getContext("2d"); const MAINCTX = g; let SC = 1;
@@ -461,7 +461,7 @@ function burst(x, y, col, n = 8, sp = 3) { if (net.quiet) return; if (net.rec) n
 const MAXT = 5; // niveles del modo bestia
 const TIERS = [{ w: 10, h: 14 }, { w: 12, h: 18 }, { w: 14, h: 22 }, { w: 16, h: 26 }, { w: 18, h: 30 }, { w: 20, h: 34 }].map((t) => ({ ...t, sc: t.h / 14 }));
 const BCOL = ["#ff7a2a", "#ff7a2a", "#ff5a2a", "#ff3a3a", "#ff2a8a", "#c03aff"];
-const TIER = { acc: [1, 1.15, 1.3, 1.45, 1.6, 1.8], max: [1.9, 2.5, 2.9, 3.3, 3.7, 4.1], beam: [14, 18, 20, 22, 24, 26], cd: [40, 18, 15, 12, 10, 8], eye: [4, 5, 6, 7, 8, 9], reach: [160, 250, 310, 370, 430, 500], th: [3, 6, 8, 10, 12, 14], dmg: [1, 3, 4, 5, 6, 8] };
+const TIER = { acc: [1, 1.1, 1.2, 1.3, 1.4, 1.5], max: [1.9, 2.4, 2.6, 2.8, 3.0, 3.2], beam: [14, 18, 20, 22, 24, 26], cd: [40, 18, 15, 12, 10, 8], eye: [4, 5, 6, 7, 8, 9], reach: [160, 250, 310, 370, 430, 500], th: [3, 6, 8, 10, 12, 14], dmg: [1, 3, 4, 5, 6, 8] };
 function setTier(n) {
   const p = player, a = TIERS[p.tier], b = TIERS[n];
   Object.assign(p, { x: p.x + (a.w - b.w) / 2, y: p.y + a.h - b.h, w: b.w, h: b.h, tier: n, big: n > 0 });
