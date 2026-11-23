@@ -1,7 +1,7 @@
 "use strict";
 // Zombilandia: platformer de zombies en canvas, sin librerías. Personajes y arte propios (rects de píxel).
 // 5 niveles: cementerio, ciudad en ruinas, pantano tóxico, laboratorio y la guarida del Rey Zombi (jefe final).
-const VERSION = "v59"; // subir en cada publicación (también en index.html)
+const VERSION = "v60"; // subir en cada publicación (también en index.html)
 // ---------- Métricas de uso (Umami, anónimas, sin cookies) ----------
 // Pegá acá el "Website ID" de tu sitio en Umami; vacío = no se manda nada. Respeta "No rastrear" del navegador y solo cuenta en el sitio publicado.
 const UMAMI = { id: "4c40559c-a7e6-4a1f-8fb1-6d289f3ffbcb", src: "https://cloud.umami.is/script.js", domains: "ccontarino.github.io" };
@@ -1329,7 +1329,7 @@ function drawZombie(z, i) {
     if (z.type === "doctor") drawGlass(z, x, y + bob);
     if (z.type === "brute" && z.hp < ZT.brute.hp) for (let k = 0; k < ZT.brute.hp; k++) R(x + 2 + k * 5, y - 5, 4, 2, k < z.hp ? "#ff5a5a" : "#3a2a2a");
   }
-  else if (z.type === "bat") { g.save(); g.translate(x + z.w / 2, y); batArt(g, { t: time, i }); g.restore(); }
+  else if (z.type === "bat") { g.save(); g.translate(x + z.w / 2, y); batArt(g, { t: time, i, theme: L.theme }); g.restore(); }
   else { g.save(); g.translate(x + z.w / 2, y + bob); g.scale(f, 1); zombieArt(g, { type: z.type, s, t: time, i, ground: z.ground, tt: z.t, broken: z.broken, fuse: z.fuse | 0, theme: L.theme }); g.restore(); }
   g.globalAlpha = 1;
   if (z.frozen > 0) { // bloque de hielo

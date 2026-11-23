@@ -158,17 +158,19 @@ function zombieArt(g, o) {
 }
 
 function batArt(g, o) {
-  const up = Math.sin(o.t * .4 + o.i) > 0, fl = up ? -1 : 1;
+  const up = Math.sin(o.t * .4 + o.i) > 0, fl = up ? -1 : 1, warm = o.theme === "carnival"; // en el parque (fondo violeta) el murciélago es naranja y brilla
+  const W0 = warm ? "#ffb060" : "#6a3a80", W1 = warm ? "#b8401a" : "#2e1a3a", B1 = warm ? "#a03a18" : "#3a2048", EA = warm ? "#e0661e" : "#4a2a5a";
   g.lineJoin = "round";
+  if (warm) { g.save(); g.globalCompositeOperation = "lighter"; g.fillStyle = "rgba(255,140,50,.28)"; g.beginPath(); g.ellipse(0, 4.4, 10, 6.4, 0, 0, 7); g.fill(); g.restore(); }
   for (const sd of [-1, 1]) { // alas con membrana
     g.save(); g.scale(sd, 1);
     g.beginPath(); g.moveTo(1.2, 4); g.quadraticCurveTo(4 + 1, 4 + fl * 5, 9, 4 + fl * 3.2); g.quadraticCurveTo(8, 4 + fl * 1.5, 7.4, 5.2 + fl * 1.2); g.quadraticCurveTo(6, 5.8 + fl * .4, 5.2, 6.2); g.quadraticCurveTo(4, 6, 3.2, 6.8); g.quadraticCurveTo(2.4, 6.2, 1.2, 6.6); g.closePath();
-    fillStroke(g, vgrad(g, 0, 9, [[0, "#6a3a80"], [1, "#2e1a3a"]]));
+    fillStroke(g, vgrad(g, 0, 9, [[0, W0], [1, W1]]));
     g.strokeStyle = "rgba(0,0,0,.45)"; g.lineWidth = .4; g.beginPath(); g.moveTo(1.6, 4.4); g.lineTo(8.2, 4 + fl * 3); g.moveTo(1.8, 5); g.lineTo(5.4, 6); g.stroke();
     g.restore();
   }
-  g.beginPath(); g.ellipse(0, 4.6, 2.5, 3.2, 0, 0, 7); fillStroke(g, vgrad(g, 1, 8, [[0, "#6a3a80"], [1, "#3a2048"]]));
-  for (const sd of [-1, 1]) { g.beginPath(); g.moveTo(sd * 1, 1.8); g.lineTo(sd * 2.4, -.4); g.lineTo(sd * 2.6, 2.2); g.closePath(); fillStroke(g, "#4a2a5a"); g.fillStyle = "#ff3030"; g.beginPath(); g.arc(sd * 1.1, 3.3, .6, 0, 7); g.fill(); }
+  g.beginPath(); g.ellipse(0, 4.6, 2.5, 3.2, 0, 0, 7); fillStroke(g, vgrad(g, 1, 8, [[0, W0], [1, B1]]));
+  for (const sd of [-1, 1]) { g.beginPath(); g.moveTo(sd * 1, 1.8); g.lineTo(sd * 2.4, -.4); g.lineTo(sd * 2.6, 2.2); g.closePath(); fillStroke(g, EA); g.fillStyle = warm ? "#fff060" : "#ff3030"; g.beginPath(); g.arc(sd * 1.1, 3.3, .6, 0, 7); g.fill(); }
   g.fillStyle = "rgba(255,50,50,.3)"; g.beginPath(); g.arc(-1.1, 3.3, 1.6, 0, 7); g.arc(1.1, 3.3, 1.6, 0, 7); g.fill();
   g.fillStyle = "#f2ead8"; g.fillRect(-.8, 5.8, .5, 1); g.fillRect(.3, 5.8, .5, 1);
 }
