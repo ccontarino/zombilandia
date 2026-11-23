@@ -100,6 +100,7 @@ function zombieArt(g, o) {
   if (type === "runner") { sk = "#d6b484"; skd = "#98724a"; sh = "#b03030"; }
   else if (type === "jumper") { sk = "#b898d8"; skd = "#76589a"; sh = "#2a5a44"; }
   else if (type === "spitter") { sk = "#c4cc5a"; skd = "#8a9430"; sh = "#6a5430"; }
+  else if (type === "exploder") { sk = "#c8d070"; skd = "#8a9438"; sh = (o.fuse | 0) && (o.t >> 2) % 2 ? "#ffd0c0" : "#7a1a1a"; }
   else { [sk, skd] = SK[i % 3]; sh = SH[(i >> 1) % 3]; }
   shd = lerpHex(sh, "#000000", .4);
   g.lineCap = "round"; g.lineJoin = "round";
@@ -118,6 +119,12 @@ function zombieArt(g, o) {
   g.fillStyle = "rgba(0,0,0,.25)"; g.fillRect(1.2, 7.3, .5, 2.2);
   if (type === "runner") { g.fillStyle = "#f4e8d8"; rr2(g, -.8, 7, 1.6, 3.4, .6); g.fill(); }
   if (type === "spitter") { const gr = g.createRadialGradient(-.6, 8.8, .5, 0, 9, 4.6); gr.addColorStop(0, "#e8f58a"); gr.addColorStop(1, "#8a9a2a"); g.beginPath(); g.ellipse(0, 9, 4.8, 2.4, 0, 0, 7); fillStroke(g, gr); }
+  if (type === "exploder") { // dinamita atada al pecho con la mecha encendida
+    for (let k = 0; k < 3; k++) { rr2(g, -3.4 + k * 2.4, 6.6, 2, 5, .7); fillStroke(g, vgrad(g, 6.6, 11.6, [[0, "#ff5a4a"], [1, "#a01810"]]), .4); }
+    g.fillStyle = "#222"; g.fillRect(-3.6, 8.2, 7.6, .8);
+    g.strokeStyle = "#caa060"; g.lineWidth = .5; g.beginPath(); g.moveTo(0, 6.6); g.quadraticCurveTo(1.4, 4.6, 3, 5.4); g.stroke();
+    const sp = (o.fuse | 0) > 0 ? 1.6 : .8 + Math.sin(t * .4) * .3; g.save(); g.globalCompositeOperation = "lighter"; g.fillStyle = "#ffd060"; g.beginPath(); g.arc(3, 5.4, sp, 0, 7); g.fill(); g.fillStyle = "rgba(255,160,40,.5)"; g.beginPath(); g.arc(3, 5.4, sp * 2.4, 0, 7); g.fill(); g.restore();
+  }
   // cabeza
   g.save(); g.translate(lean, 0);
   g.beginPath(); g.ellipse(0, 2.7, 4.3, 3.9, 0, 0, 7); fillStroke(g, vgrad(g, -1, 6.5, [[0, lerpHex(sk, "#ffffff", .25)], [.6, sk], [1, skd]]));
