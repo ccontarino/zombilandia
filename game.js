@@ -1,7 +1,7 @@
 "use strict";
 // Zombilandia: platformer de zombies en canvas, sin librerías. Personajes y arte propios (rects de píxel).
 // 5 niveles: cementerio, ciudad en ruinas, pantano tóxico, laboratorio y la guarida del Rey Zombi (jefe final).
-const VERSION = "v53"; // subir en cada publicación (también en index.html)
+const VERSION = "v54"; // subir en cada publicación (también en index.html)
 // ---------- Métricas de uso (Umami, anónimas, sin cookies) ----------
 // Pegá acá el "Website ID" de tu sitio en Umami; vacío = no se manda nada. Respeta "No rastrear" del navegador y solo cuenta en el sitio publicado.
 const UMAMI = { id: "4c40559c-a7e6-4a1f-8fb1-6d289f3ffbcb", src: "https://cloud.umami.is/script.js", domains: "ccontarino.github.io" };
@@ -244,6 +244,15 @@ function mkPlayer(i, k) {
   const keep = k?.keep || 0, x = 40 + i * 14;
   return { x, y: 150, vx: 0, vy: 0, w: 10, h: 14, face: 1, ground: false, coyote: 0, jumps: 0, cd: 0, beam: 0, beamDir: 1, ray: null, firePrev: false, shot: 0, inv: 0, dead: 0, step: 0, springT: 0, big: false, tier: 0, want: keep, growing: keep > 0, power: keep > 0 ? 1 : 0, beamBig: false, beamTier: 0, shield: !!k?.shield, hero: i === 0 ? hero : 1 - hero, skin: i === 0 ? (CFG.skin || 0) : (net.gskin || 0), safe: { x, y: 150 } };
 }
+// Punto de control: a mitad del nivel. Si te comen después de pasarlo, reintentás desde ahí.
+const cpGot = {}; let cpMemo = null;
+function cpInfo() {
+  if (endless || L?.custom || mode === "edit") return null;
+  const key = levelIdx + "|" + goalX + "|" + (map ? map[13]?.join("").length : 0); if (cpMemo && cpMemo.key === key) return cpMemo.v;
+  let v = null; const mid = Math.round(goalX * .5);
+  for (let d = 0; d < 20 && !v; d++) for (const c of [mid + d, mid - d]) { const r = surface(c); if (r > 3 && map[r][c] === "#" && map[r - 1][c] === " " && map[r - 2][c] === " " && ![-1, 0, 1].some((o) => map[r - 1][c + o] === "x" || map[r - 1][c + o] === "^")) { v = { c, r }; break; } }
+  cpMemo = { key, v }; return v;
+}
 function loadLevel(i) {
   endless = false;
   const keeps = players.map((p) => ({ keep: Math.max(p.tier, p.want), shield: !!p.shield })); // el modo bestia y el escudo pasan al nivel siguiente
@@ -264,7 +273,8 @@ function loadLevel(i) {
   for (let y = 0; y < ROWS; y++) for (let x = 0; x < COLS; x++) if (map[y][x] === "c") items.push({ x: x * T + 4, y: y * T + 4, w: 8, h: 8, got: false });
   totalBrains = items.length + map.reduce((n, row) => n + row.filter((c) => c === "?").length, 0); gotBrains = 0; levelTime = 0; damaged = false;
   deco = []; addDeco(4, goalX - 3, levelIdx);
-  parts = []; shots = []; cam = 0; shake = 0; msg = ""; msgT = 0; banner = 160; bossDead = false; arenaLocked = false; levelStart = score;
+  { const cp = !endless && cpGot[levelIdx] && !L.custom ? cpInfo() : null; if (cp) { players.forEach((p, k) => { p.x = cp.c * T + k * 12; p.y = cp.r * T - p.h; }); } cam = cp ? Math.max(0, cp.c * T - 120) : 0; }
+  parts = []; shots = []; shake = 0; msg = ""; msgT = 0; banner = 160; bossDead = false; arenaLocked = false; levelStart = score;
   if (!custom && i + 1 > unlocked) { unlocked = i + 1; try { localStorage.setItem("zombilandia-nivel", unlocked); } catch {} }
 }
 function lockArena() { arenaLocked = true; fill(arena.wall, arena.wall + 1, 2, surface(arena.wall) - 1, "#"); shake = 20; beep(90, .8, "sawtooth", 40); }
@@ -397,7 +407,7 @@ function shiftWorld() {
   if (th !== TH) { TH = th; cache = {}; say(`${meters()} metros: ¡cambia el mundo!`); }
   generate();
 }
-function newGame(i) { track("nivel_inicio", { nivel: i === NL ? "infinito" : i + 1, dificultad: ["facil", "normal", "dificil"][CFG.diff], online: net.peer ? 1 : 0, heroe: hero }); runId = Date.now(); upgrades = {}; players = []; nPlayers = net.peer ? 2 : 1; score = 0; lives = DLIVES[CFG.diff]; brains = 0; if (i === NL) startEndless(); else loadLevel(i); mode = "play"; }
+function newGame(i) { for (const k in cpGot) delete cpGot[k]; track("nivel_inicio", { nivel: i === NL ? "infinito" : i + 1, dificultad: ["facil", "normal", "dificil"][CFG.diff], online: net.peer ? 1 : 0, heroe: hero }); runId = Date.now(); upgrades = {}; players = []; nPlayers = net.peer ? 2 : 1; score = 0; lives = DLIVES[CFG.diff]; brains = 0; if (i === NL) startEndless(); else loadLevel(i); mode = "play"; }
 loadLevel(0);
 
 function collideX(o) {
@@ -801,6 +811,7 @@ function update() {
       else { brains++; gotBrains++; score += 10; beep(880, .08, "triangle", 1320); }
     }
   }
+  { const cp = cpInfo(); if (cp && !cpGot[levelIdx] && net.role !== "guest" && players.some((q) => !q.dead && q.x > cp.c * T)) { cpGot[levelIdx] = true; say("¡Punto de control!"); beep(660, .1, "triangle", 990); beep(990, .15, "triangle", 1320); } }
   if (players.some((q) => q.x > goalX * T) && (!arena || bossDead)) {
     score += lives * 100 + 500; fanfare();
     if (L.custom) { mode = "cwin"; recordScore(); } else { finishLevel(); mode = levelIdx === LEVELS.length - 1 ? "won" : "clear"; }
@@ -1156,6 +1167,12 @@ function drawTiles() {
       g.drawImage(tex("sg" + cmp, T, T, (cx) => springArt(cx, T, cmp)), px, py, T, T);
     }
   }
+  { const cp = cpInfo(); if (cp) { // banderín de punto de control
+    const got = cpGot[levelIdx] || players.some((q) => q.x > cp.c * T), fx = cp.c * T + 7 - ox, top = cp.r * T - 26, wv = (k) => Math.sin(time * .14 - k * .4) * (.6 + k * .08);
+    g.fillStyle = "#cfc8e8"; g.fillRect(fx, top, 1.6, 26); if (got) glow(fx + 8, top + 5, 12, "#7cff7c", .35 + Math.sin(time * .1) * .1);
+    g.beginPath(); g.moveTo(fx + 1.6, top + 1); for (let k = 0; k <= 11; k++) g.lineTo(fx + 1.6 + k, top + 1 + wv(k)); for (let k = 11; k >= 0; k--) g.lineTo(fx + 1.6 + k, top + 9 + wv(k) - k * .35); g.closePath();
+    g.fillStyle = got ? vgrad(g, top, top + 9, [[0, "#9aff8a"], [1, "#2a9a3a"]]) : vgrad(g, top, top + 9, [[0, "#9a96b0"], [1, "#4a4660"]]); g.fill();
+  } }
   if (!arena || bossDead) { // bandera
     const base = Math.max(surface(goalX), 3), fx = goalX * T - ox, top = (base - 8) * T, wv = (k) => Math.sin(time * .12 - k * .35) * (1 + k * .09);
     rr(fx - 4, base * T - 4, 10, 4, 1.5, "#6b5a4f"); rr(fx - 4, base * T - 4, 10, 1, .5, "#9a8a7a");
@@ -1296,7 +1313,7 @@ function drawZombie(z, i) {
     if (z.type === "brute" && z.hp < ZT.brute.hp) for (let k = 0; k < ZT.brute.hp; k++) R(x + 2 + k * 5, y - 5, 4, 2, k < z.hp ? "#ff5a5a" : "#3a2a2a");
   }
   else if (z.type === "bat") { g.save(); g.translate(x + z.w / 2, y); batArt(g, { t: time, i }); g.restore(); }
-  else { g.save(); g.translate(x + z.w / 2, y + bob); g.scale(f, 1); zombieArt(g, { type: z.type, s, t: time, i, ground: z.ground, tt: z.t, broken: z.broken, fuse: z.fuse | 0 }); g.restore(); }
+  else { g.save(); g.translate(x + z.w / 2, y + bob); g.scale(f, 1); zombieArt(g, { type: z.type, s, t: time, i, ground: z.ground, tt: z.t, broken: z.broken, fuse: z.fuse | 0, theme: L.theme }); g.restore(); }
   g.globalAlpha = 1;
   if (z.frozen > 0) { // bloque de hielo
     const blink = z.frozen < 60 && (z.frozen >> 3) % 2;

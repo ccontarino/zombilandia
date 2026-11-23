@@ -137,6 +137,14 @@ function zombieArt(g, o) {
   if (type === "jumper") { g.fillStyle = "#e06080"; rr2(g, 3.2, 5.2 + (Math.sin(t * .2 + i) > 0 ? .5 : 0), 1.8, .9, .45); g.fill(); }
   if (type === "spitter" && o.tt % 120 > 96) { g.fillStyle = "#1a0a0c"; g.beginPath(); g.ellipse(2.2, 5.2, 1.6, 1.3, 0, 0, 7); g.fill(); g.fillStyle = "#b6f03a"; rr2(g, 2, 6, .9, 2.4, .4); g.fill(); }
   if (type === "shielder") { g.beginPath(); g.moveTo(-4.6, 2); g.quadraticCurveTo(-4.4, -2.8, 0, -2.8); g.quadraticCurveTo(4.4, -2.8, 4.6, 2); g.closePath(); fillStroke(g, vgrad(g, -3, 2, [[0, "#9aa6b8"], [1, "#4a5466"]])); g.fillStyle = "rgba(255,255,255,.35)"; g.fillRect(-2.5, -2.2, 3, .6); }
+  { // accesorios según el escenario: cada mundo tiene sus propios zombis
+    const th = o.theme;
+    if (th === "snow") { g.fillStyle = "#4a9ad8"; g.beginPath(); g.moveTo(-4.4, 1.4); g.quadraticCurveTo(-4.2, -3.6, 0, -3.8); g.quadraticCurveTo(4.4, -3.6, 4.4, 1.4); g.closePath(); fillStroke(g, vgrad(g, -4, 1.6, [[0, "#8ad0ff"], [1, "#2a6aa8"]]), .4); g.fillStyle = "#f4faff"; g.beginPath(); g.arc(0, -4.2, 1.3, 0, 7); g.fill(); g.fillRect(-4.4, .6, 8.8, .9); g.fillStyle = "#c0382a"; rr2(g, -4, 6, 8, 1.6, .7); g.fill(); }
+    else if (th === "desert") { g.strokeStyle = "#e8d8a8"; g.lineWidth = 1; for (const [y0, y1] of [[-.6, .4], [1.2, 2.2], [3.4, 3.8]]) { g.beginPath(); g.moveTo(-4.2, y0); g.lineTo(4.2, y1); g.stroke(); } g.strokeStyle = "rgba(90,60,20,.4)"; g.lineWidth = .3; g.beginPath(); g.moveTo(-4, .2); g.lineTo(4, 1); g.moveTo(-4, 2.8); g.lineTo(4, 3.4); g.stroke(); }
+    else if (th === "jungle") { for (const [a, b, r] of [[-3, -1.6, .8], [-1, -2.6, .9], [1.4, -2.7, .9], [3.2, -1.4, .8]]) { g.save(); g.translate(a, b); g.rotate(a * .3); g.beginPath(); g.ellipse(0, -1, r * .8, r * 1.8, 0, 0, 7); fillStroke(g, "#3aa84a", .3); g.restore(); } g.strokeStyle = "#2a7a30"; g.lineWidth = .5; g.beginPath(); g.moveTo(-4, 5.6); g.quadraticCurveTo(0, 7.4, 4, 5.6); g.stroke(); }
+    else if (th === "carnival") { const cl = ["#ff5a8a", "#ffcc33", "#5ae0ff", "#9aff6a"]; for (let k = 0; k < 5; k++) { g.beginPath(); g.arc(-4 + k * 2, -1.2 - (k % 2) * .9, 1.5, 0, 7); fillStroke(g, cl[k % 4], .3); } g.beginPath(); g.arc(3.4, 3.6, 1.1, 0, 7); fillStroke(g, "#ff3030", .3); }
+    else if (th === "moon") { g.beginPath(); g.ellipse(0, 2.2, 5.6, 5.2, 0, 0, 7); g.fillStyle = "rgba(150,210,255,.22)"; g.fill(); g.lineWidth = .8; g.strokeStyle = "rgba(220,240,255,.85)"; g.stroke(); g.fillStyle = "rgba(255,255,255,.7)"; g.beginPath(); g.ellipse(-2.6, -.8, 1.3, .6, -.7, 0, 7); g.fill(); }
+  }
   g.restore();
   // brazo extendido hacia adelante
   g.save(); g.translate(2.6, 7.6); g.rotate(type === "runner" ? .2 : s > 0 ? -.1 : .12);
