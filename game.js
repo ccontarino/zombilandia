@@ -1,7 +1,7 @@
 "use strict";
 // Zombilandia: platformer de zombies en canvas, sin librerías. Personajes y arte propios (rects de píxel).
 // 5 niveles: cementerio, ciudad en ruinas, pantano tóxico, laboratorio y la guarida del Rey Zombi (jefe final).
-const VERSION = "v26"; // subir en cada publicación (también en index.html)
+const VERSION = "v27"; // subir en cada publicación (también en index.html)
 const T = 16, H = 240, ROWS = 15, COLS = 215;
 let W = 480, cache = {};
 const cv = document.getElementById("c"), g = cv.getContext("2d");
@@ -1325,7 +1325,7 @@ function draw() {
   g.fillStyle = grads().vig; g.fillRect(0, 0, W, H);
   hud(); g.restore();
   g.font = "8px ui-monospace, monospace"; g.textAlign = "right"; g.textBaseline = "bottom"; g.globalAlpha = .6; text(VERSION, W - 3, H - 2, "#cfc8e8"); g.globalAlpha = 1; g.textAlign = "left";
-  if (mode === "title") { if (net.role === "guest") net.lobby(); else drawTitle(); }
+  if (mode === "title") { if (net.role === "guest" || net.joining) net.lobby(); else drawTitle(); }
   else if (mode === "__") panel("ZOMBILANDIA", ["Saltá sobre los zombis o usá el rayo.", "Doble salto: saltá otra vez en el aire.", "5 mundos y un jefe final.", records[0] ? `Récord: ${records[0].n} ${records[0].s}` : "", "Tocá o apretá una tecla para empezar", ...(unlocked > 1 ? [`o tocá ⚡ para seguir desde el nivel ${unlocked}`] : [])], "#7cc456");
   else if (mode === "shop") drawShop();
   else if (mode === "clear") {
@@ -1405,7 +1405,7 @@ cv.addEventListener("pointerdown", (e) => {
     const i = SHOP.findIndex((_, j) => { const b = shopRow(j); return x >= b.x && x <= b.x + b.w && y >= b.y && y <= b.y + b.h; });
     if (i >= 0) { if (net.role === "guest") net.send({ t: "shop", i }); else { shopSel = i; shopAct(i); } } return;
   }
-  if (mode === "title" && !naming && net.role === "guest") return;
+  if (mode === "title" && !naming && (net.role === "guest" || net.joining)) return;
   if (mode === "title" && !naming) { // tocar un nivel lo elige y arranca
     const r = cv.getBoundingClientRect(), x = (e.clientX - r.left) / r.width * W, y = (e.clientY - r.top) / r.height * H;
     const i = titleBoxes().findIndex((b) => x >= b.x && x <= b.x + b.w && y >= b.y && y <= b.y + b.h);

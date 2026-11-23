@@ -210,7 +210,7 @@ const DEFAULT_RELAY = "wss://zombilandia.ccontarino.workers.dev"; // dirección 
     sock.onerror = () => {};
   }
   function fail(msg) { net.role = null; net.peer = false; ws = null; showOn(true); $("onMenu").hidden = false; $("onSala").hidden = true; setMsg(msg); }
-  function leave() {
+  function leave() { net.joining = false;
     closing = true; const was = net.role; try { ws?.close(); } catch {} ws = null;
     net.role = null; net.peer = false; net.paused = false; net.rec = null; note = ""; gotSnap = false;
     for (const k of ["left", "right", "jump", "fire"]) keys2[k] = false;
@@ -253,9 +253,10 @@ const DEFAULT_RELAY = "wss://zombilandia.ccontarino.workers.dev"; // dirección 
     $("onCopy").onclick = async () => { try { await navigator.clipboard.writeText($("onLink").value); setMsg("Link copiado."); } catch { $("onLink").select(); setMsg("Copialo a mano."); } };
     const sh = $("onShare"); if (navigator.share) { sh.hidden = false; sh.onclick = () => navigator.share({ title: "Zombilandia", text: "Vení a jugar Zombilandia conmigo:", url: $("onLink").value }).catch(() => {}); }
     const s = (qp.get("sala") || "").toUpperCase();
+    if (/^[A-Z0-9]{4}$/.test(s)) net.joining = true;
     if (/^[A-Z0-9]{4}$/.test(s)) { showOn(true); $("onMenu").hidden = true; $("onLeave").hidden = true; if (!RELAY) { $("onMenu").hidden = false; setMsg("Las partidas online todavía no están configuradas."); } else { setMsg(`Entrando a la sala ${s}…`); connect("guest", s); } }
   }
-  net.lobby = () => panel("ONLINE", [`Sala ${code}`, "", "Conectado.", "Esperando que el anfitrión", "elija el nivel…"], "#7cc456");
+  net.lobby = () => panel("ONLINE", net.role ? [`Sala ${code}`, "", "Conectado.", "Esperando que el anfitrión", "elija el nivel…"] : ["", "Conectando a la sala…", "", "El anfitrión elige el nivel."], "#7cc456");
   net.draw = () => {
     if (!net.role) return;
     g.textBaseline = "bottom"; g.font = "8px ui-monospace, monospace"; g.textAlign = "left";
