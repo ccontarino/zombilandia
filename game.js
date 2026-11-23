@@ -1,7 +1,7 @@
 "use strict";
 // Zombilandia: platformer de zombies en canvas, sin librerías. Personajes y arte propios (rects de píxel).
 // 5 niveles: cementerio, ciudad en ruinas, pantano tóxico, laboratorio y la guarida del Rey Zombi (jefe final).
-const VERSION = "v35"; // subir en cada publicación (también en index.html)
+const VERSION = "v36"; // subir en cada publicación (también en index.html)
 const T = 16, H = 240, ROWS = 15, COLS = 215;
 let W = 480, cache = {};
 const cv = document.getElementById("c"); let g = cv.getContext("2d"); const MAINCTX = g; let SC = 1;
@@ -220,7 +220,7 @@ let upgrades = {}, shopSel = 0, shopMsg = "", shopMsgT = 0;
 const SHOP = [
   { name: "Vida extra", price: 30, ok: () => lives < 9, buy: () => { lives++; } },
   { name: "Escudo", price: 25, ok: () => players.some((p) => !p.shield), buy: () => { for (const p of players) p.shield = true; } },
-  { name: "Jeringa (modo bestia)", price: 50, ok: () => players.some((p) => Math.max(p.tier, p.want) < 2), buy: () => { for (const p of players) p.want = Math.min(2, Math.max(p.tier, p.want) + 1); } },
+  { name: "Jeringa (modo bestia)", price: 50, ok: () => players.some((p) => Math.max(p.tier, p.want) < MAXT), buy: () => { for (const p of players) p.want = Math.min(MAXT, Math.max(p.tier, p.want) + 1); } },
   { name: "Rayo largo, para siempre", price: 80, ok: () => !upgrades.longRay, buy: () => { upgrades.longRay = true; } },
   { name: "Seguir al próximo nivel", price: 0 },
 ];
@@ -427,8 +427,10 @@ function burst(x, y, col, n = 8, sp = 3) { if (net.quiet) return; if (net.rec) n
 // Jeringa: modo bestia. Más grande y musculoso, corre más rápido y el rayo pega más fuerte.
 // Una segunda jeringa da el modo bestia x2 (el doble de grande). Cada golpe te baja un nivel de poder en vez de sacarte una vida;
 // perder una vida te deja normal. Se mantiene entre niveles.
-const TIERS = [{ w: 10, h: 14, sc: 1 }, { w: 14, h: 21, sc: 1.5 }, { w: 18, h: 28, sc: 2 }];
-const TIER = { acc: [1, 1.3, 1.5], max: [1.9, 2.8, 3.4], beam: [14, 18, 22], cd: [40, 16, 12], eye: [4, 6, 7], reach: [160, 280, 380], th: [3, 7, 11], dmg: [1, 3, 5] };
+const MAXT = 5; // niveles del modo bestia
+const TIERS = [{ w: 10, h: 14 }, { w: 12, h: 18 }, { w: 14, h: 22 }, { w: 16, h: 26 }, { w: 18, h: 30 }, { w: 20, h: 34 }].map((t) => ({ ...t, sc: t.h / 14 }));
+const BCOL = ["#ff7a2a", "#ff7a2a", "#ff5a2a", "#ff3a3a", "#ff2a8a", "#c03aff"];
+const TIER = { acc: [1, 1.15, 1.3, 1.45, 1.6, 1.8], max: [1.9, 2.5, 2.9, 3.3, 3.7, 4.1], beam: [14, 18, 20, 22, 24, 26], cd: [40, 18, 15, 12, 10, 8], eye: [4, 5, 6, 7, 8, 9], reach: [160, 250, 310, 370, 430, 500], th: [3, 6, 8, 10, 12, 14], dmg: [1, 3, 4, 5, 6, 8] };
 function setTier(n) {
   const p = player, a = TIERS[p.tier], b = TIERS[n];
   Object.assign(p, { x: p.x + (a.w - b.w) / 2, y: p.y + a.h - b.h, w: b.w, h: b.h, tier: n, big: n > 0 });
@@ -446,15 +448,15 @@ const vibe = (p) => { if (net.rec) net.rec.push([3, p, pi]); if (vibeOn && canVi
 function toggleVibe() { vibeOn = !vibeOn; try { localStorage.setItem("zombilandia-vibra", vibeOn ? "1" : "0"); } catch {} const b = document.getElementById("vib"); if (b) b.style.opacity = vibeOn ? 1 : .4; vibe(40); }
 function powerUp() {
   vibe([30, 40, 60]);
-  const p = player; p.want = Math.min(2, Math.max(p.tier, p.want) + 1); p.growing = true; p.power = 1;
-  say(p.want === 2 ? "¡MODO BESTIA x2!" : "¡MODO BESTIA!"); shake = p.want === 2 ? 12 : 6;
-  [196, 262, 330, 392, 523, 659].forEach((f, i) => beep(f / (p.want === 2 ? 2 : 1), .12, "square", 0, i * .06)); if (p.want === 2) beep(55, .8, "sawtooth", 110);
+  const p = player; p.want = Math.min(MAXT, Math.max(p.tier, p.want) + 1); p.growing = true; p.power = 1;
+  say(p.want === MAXT ? "¡BESTIA MÁXIMA!" : p.want === 1 ? "¡MODO BESTIA!" : `¡BESTIA NIVEL ${p.want}!`); shake = 4 + p.want * 3;
+  [196, 262, 330, 392, 523, 659].forEach((f, i) => beep(f / (1 + p.want * .35), .12, "square", 0, i * .06)); if (p.want > 1) beep(80 / p.want, .8, "sawtooth", 110);
 }
 function tryGrow() { // crece de a un nivel, solo si hay lugar (por ejemplo, no debajo de un techo bajo)
   const p = player;
   if (p.tier >= p.want) { p.growing = false; return; }
   if (!fits(p.tier + 1)) return;
-  setTier(p.tier + 1); burst(p.x + p.w / 2, p.y + p.h / 2, p.tier === 2 ? "#ff2a8a" : "#ff5a3a", 16 + p.tier * 8, 4 + p.tier);
+  setTier(p.tier + 1); burst(p.x + p.w / 2, p.y + p.h / 2, BCOL[p.tier], 16 + p.tier * 6, 4 + p.tier);
   if (p.tier >= p.want) p.growing = false;
 }
 function shrink(to = 0) {
@@ -471,7 +473,7 @@ function hurt(src) {
     burst(p.x + p.w / 2, p.y + p.h / 2, "#bfefff", 16, 4); beep(900, .25, "triangle", 200); say("¡Se rompió el escudo!"); return;
   }
   const lvl = Math.max(p.tier, p.want);
-  if (lvl > 0) { shrink(lvl - 1); shake = 8; p.inv = 100; p.vy = -4; p.vx = src ? (Math.sign(p.x - src.x) || -p.face) * 3 : -p.face * 2; say(lvl === 2 ? "¡Bajaste a modo bestia!" : "¡Perdiste el poder!"); return; }
+  if (lvl > 0) { shrink(lvl - 1); shake = 8; p.inv = 100; p.vy = -4; p.vx = src ? (Math.sign(p.x - src.x) || -p.face) * 3 : -p.face * 2; say(lvl === 1 ? "¡Perdiste el poder!" : `¡Bajaste a bestia ${lvl - 1}!`); return; }
   lives--; shake = 8; beep(180, .25, "sawtooth", 60);
   if (lives <= 0) return gameOver();
   p.inv = 100; p.vy = -4.5; p.vx = src ? (Math.sign(p.x + p.w / 2 - src.x - src.w / 2) || -p.face) * (src.type && ZT[src.type]?.boss ? 4 : 2.5) : -p.face * 2;
@@ -607,8 +609,8 @@ function stepPlayer(i) {
   // rayo láser de ojos: se dispara al apretar, con recarga
   if (p.cd > 0) p.cd--;
   if ((TP.fire || K.fire && !p.firePrev) && p.cd <= 0) {
-    const t = p.tier; p.beamTier = t; p.beamBig = t > 0; p.beam = TIER.beam[t]; p.cd = TIER.cd[t]; p.beamDir = p.face; p.shot++; shake = [3, 7, 11][t]; if (t) vibe(30 * t);
-    beep([140, 90, 60][t], [.25, .4, .5][t], "sawtooth", [900, 600, 400][t]); if (t) beep(60 / t, .4, "square", 30);
+    const t = p.tier; p.beamTier = t; p.beamBig = t > 0; p.beam = TIER.beam[t]; p.cd = TIER.cd[t]; p.beamDir = p.face; p.shot++; shake = [3, 5, 7, 9, 11, 13][t]; if (t) vibe(20 + 10 * t);
+    beep([140, 100, 85, 70, 60, 50][t], [.25, .35, .4, .45, .5, .55][t], "sawtooth", [900, 700, 600, 500, 420, 360][t]); if (t) beep(60 / t, .4, "square", 30);
   }
   p.firePrev = K.fire; TP.fire = false;
   if (p.beam > 0) {
@@ -616,8 +618,8 @@ function stepPlayer(i) {
     const d = p.beamDir, x0 = d > 0 ? p.x + p.w : p.x, y = p.y + TIER.eye[p.tier], reach = TIER.reach[p.beamTier] + (upgrades.longRay ? 90 : 0), th = TIER.th[p.beamTier]; let len = 0;
     while (len < reach && !solid(Math.floor((x0 + d * len) / T), Math.floor(y / T))) len += 2;
     p.ray = { x: d > 0 ? x0 : x0 - len, y: y - (th >> 1), w: len, h: th };
-    if (time % 2 === 0) burst(x0 + d * len, y, p.hero === 1 ? "#e8f6ff" : ["#bff8ff", "#ffd84a", "#ff9ae0"][p.beamTier], 2 + p.beamTier * 2);
-    const zone = { x: p.ray.x, y: p.ray.y, w: p.ray.w, h: p.ray.h + [0, 6, 16][p.beamTier] }; // de grande el rayo también alcanza a los zombis chicos
+    if (time % 2 === 0) burst(x0 + d * len, y, p.hero === 1 ? "#e8f6ff" : ["#bff8ff", "#ffd84a", "#ffb04a", "#ff7a4a", "#ff6aa0", "#ff9ae8"][p.beamTier], 2 + p.beamTier * 2);
+    const zone = { x: p.ray.x, y: p.ray.y, w: p.ray.w, h: p.ray.h + [0, 6, 10, 14, 18, 22][p.beamTier] }; // de grande el rayo también alcanza a los zombis chicos
     p.zone = zone;
     for (const z of zombies) if (!z.dead && z.shot !== p.shot && hit(zone, z)) {
       z.shot = p.shot;
@@ -1119,10 +1121,10 @@ function drawZombie(z, i) {
 function drawPlayer(p) {
   if (p.dead) return;
   if (p.inv > 0 && Math.floor(p.inv / 4) % 2) return;
-  const f = p.face, big = p.tier > 0, x2 = p.tier === 2, sc = big ? TIERS[p.tier].sc : 1, air = !p.ground, run = !air && Math.abs(p.vx) > .3;
+  const f = p.face, big = p.tier > 0, x2 = p.tier >= 3, sc = p.h / 15.4 < 1 ? 1 : p.h / 15.4, air = !p.ground, run = !air && Math.abs(p.vx) > .3;
   const cx = p.x - cam + p.w / 2, ty = p.y + p.h - 15.4 * sc;
   if (big) {
-    glow(cx, p.y + p.h / 2, 20 * sc, x2 ? "#ff2a8a" : "#ff5a3a", .4 + Math.sin(time * .25) * .12);
+    glow(cx, p.y + p.h / 2, 16 * sc, BCOL[p.tier], .35 + p.tier * .04 + Math.sin(time * .25) * .1);
     if (x2) for (let k = 0; k < 3; k++) { const a = time * .15 + k * 2.1; glow(cx + Math.cos(a) * 11, p.y + p.h / 2 + Math.sin(a) * 11, 4, "#ffd0f0", .8); }
   }
   g.save(); g.translate(cx, ty); g.scale(f * sc, sc);
@@ -1148,7 +1150,10 @@ function drawShield(p) {
 function drawBeam(p) {
   if (!p.ray || p.beam <= 0) return;
   const r = p.ray, x = r.x - Math.floor(cam), start = p.beamDir > 0 ? x : x + r.w, end = p.beamDir > 0 ? x + r.w : x, B = p.beamBig;
-  const [c1, c2, c3] = (p.hero === 1 ? [["#3a7aff", "#9ad0ff", "#f0faff"], ["#2a5aff", "#bfe0ff", "#ffffff"], ["#7a5aff", "#cfc0ff", "#ffffff"]] : [["#3fd9ff", "#7ff5ff", "#bff8ff"], ["#ff7a1a", "#ffd84a", "#fff6c0"], ["#ff2a8a", "#ff9ae0", "#fff0ff"]])[p.beamTier], cy = r.y + (r.h >> 1), k = p.beamTier + 1, j = B ? Math.round(Math.sin(time * .9) * k) : 0;
+  const PAL = p.hero === 1
+    ? [["#3a7aff", "#9ad0ff", "#f0faff"], ["#2a5aff", "#bfe0ff", "#ffffff"], ["#3a5aff", "#cfe0ff", "#ffffff"], ["#5a5aff", "#cfc8ff", "#ffffff"], ["#7a5aff", "#d8c8ff", "#ffffff"], ["#a05aff", "#ecc8ff", "#ffffff"]]
+    : [["#3fd9ff", "#7ff5ff", "#bff8ff"], ["#ff9a1a", "#ffe04a", "#fff6c0"], ["#ff7a1a", "#ffd84a", "#fff6c0"], ["#ff4a2a", "#ffa84a", "#fff0c0"], ["#ff2a5a", "#ff9ab0", "#fff0f4"], ["#ff2aa8", "#ff9ae8", "#fff0ff"]];
+  const [c1, c2, c3] = PAL[p.beamTier], cy = r.y + (r.h >> 1), k = 1 + p.beamTier * .8, j = B ? Math.round(Math.sin(time * .9) * k) : 0;
   g.globalCompositeOperation = "lighter";
   g.globalAlpha = .16; R(x, cy - 5 * k + j, r.w, 11 * k, c1);
   g.globalAlpha = .45; R(x, cy - 2 * k, r.w, 5 * k, c1);
@@ -1174,7 +1179,7 @@ function hud() {
   }
   text(clock(levelTime), W - 40, 15, levelTime / 60 > PAR[levelIdx] ? "#ff8a7a" : "#cfc8e8");
   text("RAYO", 8, 15, "#7ff5ff"); rr(36, 18, 40, 4, 2, "#12303c"); rr(36, 18, Math.max(2, Math.round(40 * (1 - player.cd / 40))), 4, 2, player.cd ? "#3fd9ff" : "#bff8ff");
-  if (player.power > 0) text(Math.max(player.tier, player.want) === 2 ? "BESTIA x2" : "BESTIA", 84, 15, Math.sin(time * .15) > 0 ? "#ffb03a" : "#ff7a1a");
+  if (player.power > 0) text(Math.max(player.tier, player.want) > 1 ? "BESTIA " + Math.max(player.tier, player.want) : "BESTIA", 84, 15, Math.sin(time * .15) > 0 ? "#ffb03a" : "#ff7a1a");
   const boss = arenaLocked && zombies.find((z) => isBoss(z) && !z.dead);
   if (boss) {
     const k = ZT[boss.type]; g.textAlign = "center"; text(k.boss, W / 2, 33, "#e8b830"); rr(W / 2 - 60, 45, 120, 5, 2.5, "#2a0a0a"); rr(W / 2 - 60, 45, Math.max(2, Math.round(120 * boss.hp / k.hp)), 5, 2.5, "#e02a4a"); R(W / 2 - 60, 45, Math.round(120 * boss.hp / k.hp), 1, "#ff8a9a");
@@ -1377,7 +1382,7 @@ function drawLights() { // se llama después de dibujar todo, antes de la viñet
   for (const p of players) {
     if (p.dead) continue;
     if (p.ray) glow(p.ray.x - cam + p.ray.w / 2, p.ray.y + p.ray.h / 2, Math.max(10, p.ray.h * 3), p.hero === 1 ? "#7fb8ff" : "#7ff5ff", .5);
-    if (p.power > 0) glow(p.x - cam + p.w / 2, p.y + p.h / 2, 22 + p.tier * 8, "#ff8a1a", .35 + .1 * Math.sin(time * .2));
+    if (p.power > 0) glow(p.x - cam + p.w / 2, p.y + p.h / 2, 22 + p.tier * 6, BCOL[p.tier], .35 + .1 * Math.sin(time * .2));
     glow(p.x - cam + p.w / 2, p.y + p.h * .35, 8, p.hero === 1 ? "#9ad0ff" : "#7ff5ff", .18);
   }
   for (const z of zombies) if (!z.dead && z.type && isBoss(z)) glow(z.x - cam + z.w / 2, z.y + z.h * .3, 26, "#ff3a2a", .22);
