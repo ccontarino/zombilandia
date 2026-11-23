@@ -1,6 +1,7 @@
 "use strict";
 // Zombilandia: platformer de zombies en canvas, sin librerías. Personajes y arte propios (rects de píxel).
 // 5 niveles: cementerio, ciudad en ruinas, pantano tóxico, laboratorio y la guarida del Rey Zombi (jefe final).
+const VERSION = "v6"; // subir en cada publicación (también en index.html)
 const T = 16, H = 240, ROWS = 15, COLS = 190;
 let W = 480, cache = {};
 const cv = document.getElementById("c"), g = cv.getContext("2d");
@@ -660,6 +661,7 @@ function draw() {
   for (const q of parts) { g.globalAlpha = Math.min(1, q.life / 20); R(q.x - cam, q.y, 2, 2, q.col); } g.globalAlpha = 1;
   g.fillStyle = grads().vig; g.fillRect(0, 0, W, H);
   hud(); g.restore();
+  g.font = "8px ui-monospace, monospace"; g.textAlign = "right"; g.textBaseline = "bottom"; g.globalAlpha = .6; text(VERSION, W - 3, H - 2, "#cfc8e8"); g.globalAlpha = 1; g.textAlign = "left";
   if (mode === "title") panel("ZOMBILANDIA", ["Saltá sobre los zombis o usá el rayo.", "Doble salto: saltá otra vez en el aire.", "5 mundos y un jefe final.", "", "Tocá o apretá una tecla para empezar", ...(unlocked > 1 ? [`o tocá ⚡ para seguir desde el nivel ${unlocked}`] : [])], "#7cc456");
   else if (mode === "clear") panel("¡NIVEL SUPERADO!", [L.name, `Puntos: ${score}  ·  Cerebros: ${brains}`, "", `Sigue: ${LEVELS[levelIdx + 1].name}`, "Tocá o apretá una tecla para seguir"], "#f2c94c");
   else if (mode === "over") panel("TE COMIERON", [`Nivel ${levelIdx + 1}: ${L.name}`, "", "Tocá o apretá una tecla", "para reintentar el nivel"], "#ff5a5a");
