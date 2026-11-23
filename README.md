@@ -18,6 +18,7 @@ Platformer de zombies para el navegador, hecho con canvas y sin librerías. Pers
 - **Tienda:** entre nivel y nivel gastás los cerebros en vida extra (30), escudo (25), jeringa (50) o rayo largo para toda la partida (80).
 - **Plataformas y agua:** plataformas que se mueven (grúas, ascensores, troncos, cadenas sobre la lava), plataformas rajadas que se derrumban cuando las pisás y vuelven a aparecer, y una laguna en el pantano donde se nada tocando saltar.
 - **Jefes:** cada nivel termina en una arena con su jefe y punto de control: el Enterrador (tira lápidas), el Bombero zombi (chorros de fuego), la Rana tóxica (saltos y burbujas de ácido), el Doctor zombi (vidrio protector que hay que romper y clones) y el Rey Zombi.
+- **Personajes:** en el inicio, con ⚡ (o la tecla C), elegís entre Chispa (rayo de plasma) y Escarcha, cuyo rayo congela a los zombis: congelados no lastiman y sirven de plataforma; un segundo disparo los rompe.
 - **Progreso:** el juego recuerda hasta qué nivel llegaste; en la pantalla de inicio tocá ⚡ (o apretá el número del nivel) para seguir desde ahí.
 - **Reglas:** saltale encima a los zombis para eliminarlos, juntá cerebros (son la moneda de la tienda), abrí los bloques `?` pegándoles desde abajo y llegá a la bandera.
 

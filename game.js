@@ -1,7 +1,7 @@
 "use strict";
 // Zombilandia: platformer de zombies en canvas, sin librerías. Personajes y arte propios (rects de píxel).
 // 5 niveles: cementerio, ciudad en ruinas, pantano tóxico, laboratorio y la guarida del Rey Zombi (jefe final).
-const VERSION = "v19"; // subir en cada publicación (también en index.html)
+const VERSION = "v20"; // subir en cada publicación (también en index.html)
 const T = 16, H = 240, ROWS = 15, COLS = 215;
 let W = 480, cache = {};
 const cv = document.getElementById("c"), g = cv.getContext("2d");
@@ -115,6 +115,10 @@ const ZT = {
   shielder: { w: 12, h: 14, hp: 1, speed: .35, pts: 200 }, // escudero: el rayo no lo pasa de frente (salvo bestia x2)
 };
 const isBoss = (z) => !!ZT[z.type].boss;
+// Personajes: 0 = Chispa (rayo de plasma), 1 = Escarcha (rayo de hielo que congela)
+const HEROES = [{ name: "CHISPA", power: "rayo de plasma" }, { name: "ESCARCHA", power: "rayo de hielo: congela" }];
+let hero = 0; try { hero = +localStorage.getItem("zombilandia-heroe") === 1 ? 1 : 0; } catch {}
+const setHero = (h) => { hero = h; try { localStorage.setItem("zombilandia-heroe", h); } catch {} };
 const BOSS_NAME = { boss: "el Rey Zombi", digger: "el Enterrador", fireman: "el Bombero zombi", toad: "la Rana tóxica", doctor: "el Doctor zombi" };
 const deA = (n) => n.startsWith("el ") ? "al " + n.slice(3) : "a " + n; // "a el" se dice "al"
 let arena = null, bossCheck = null; // punto de control en la arena del jefe: si perdés ahí, volvés directo al jefe
@@ -442,6 +446,12 @@ function updateZombie(z, p) {
   const dx = p.x - z.x, boss = isBoss(z);
   if (boss ? !arenaLocked : Math.abs(dx) > 280) return; // solo se mueven cerca (el jefe, cuando se cierra la arena)
   z.t++; if (z.flash) z.flash--;
+  if (z.frozen > 0) { // congelado: solo cae, no ataca; al final se descongela
+    if (--z.frozen === 0) { burst(z.x + z.w / 2, z.y + z.h / 2, "#cfe8ff", 8); beep(700, .1, "triangle", 300); }
+    z.vy = Math.min(z.vy + .28, 7); collideY(z);
+    if (z.y > ROWS * T + 30 || touching(z, "~", 4)) { z.dead = 1; }
+    return;
+  }
   if (z.type === "runner" && Math.abs(dx) < 150 && Math.abs(p.y - z.y) < 40) z.vx = (Math.sign(dx) || 1) * 1.3;
   if (z.type === "jumper" && z.ground && z.t % 90 === 0) { z.vy = -4.8; z.vx = Math.abs(dx) < 160 ? Math.sign(dx) * .8 : z.vx; }
   if (z.type === "bat") { // vuela: no usa gravedad ni choca con el piso
@@ -508,7 +518,8 @@ function update() {
   p.vy = wet ? Math.min(p.vy + 0.1, 1.4) : Math.min(p.vy + 0.28, 6.5);
   const vyb = p.vy, pb = p.y + p.h; collideX(p); collideY(p);
   p.onMover = null;
-  if (p.vy >= 0) for (const m of movers) if (p.x + p.w > m.x + 1 && p.x < m.x + m.w - 1 && pb <= m.y + 4 && p.y + p.h >= m.y) { p.y = m.y - p.h; p.vy = 0; p.ground = true; p.onMover = m; break; }
+  const ices = zombies.filter((z) => z.frozen > 0 && !z.dead).map((z) => ({ x: z.x, y: z.y, w: z.w, vx: 0, vy: 0, ice: true }));
+  if (p.vy >= 0) for (const m of [...movers, ...ices]) if (p.x + p.w > m.x + 1 && p.x < m.x + m.w - 1 && pb <= m.y + 4 && p.y + p.h >= m.y) { p.y = m.y - p.h; p.vy = 0; p.ground = true; p.onMover = m.ice ? null : m; break; }
   if (p.ground && !p.onMover) for (const xx of [p.x + 1, p.x + p.w - 1]) { // plataformas que se derrumban
     const tx = Math.floor(xx / T), ty = Math.floor((p.y + p.h + 2) / T), k = tx + "," + ty;
     if (map[ty]?.[tx] === "F" && !(k in crumble)) { crumble[k] = 28; beep(180, .1, "square", 120); }
@@ -538,7 +549,7 @@ function update() {
     const d = p.beamDir, x0 = d > 0 ? p.x + p.w : p.x, y = p.y + TIER.eye[p.tier], reach = TIER.reach[p.beamTier] + (upgrades.longRay ? 90 : 0), th = TIER.th[p.beamTier]; let len = 0;
     while (len < reach && !solid(Math.floor((x0 + d * len) / T), Math.floor(y / T))) len += 2;
     p.ray = { x: d > 0 ? x0 : x0 - len, y: y - (th >> 1), w: len, h: th };
-    if (time % 2 === 0) burst(x0 + d * len, y, ["#bff8ff", "#ffd84a", "#ff9ae0"][p.beamTier], 2 + p.beamTier * 2);
+    if (time % 2 === 0) burst(x0 + d * len, y, hero === 1 ? "#e8f6ff" : ["#bff8ff", "#ffd84a", "#ff9ae0"][p.beamTier], 2 + p.beamTier * 2);
     const zone = { x: p.ray.x, y: p.ray.y, w: p.ray.w, h: p.ray.h + [0, 6, 16][p.beamTier] }; // de grande el rayo también alcanza a los zombis chicos
     p.zone = zone;
     for (const z of zombies) if (!z.dead && z.shot !== p.shot && hit(zone, z)) {
@@ -547,6 +558,10 @@ function update() {
         if (p.beamTier < 2) { burst(z.x + (d > 0 ? 0 : 12), z.y + 7, "#e8eef5", 8); beep(1200, .06, "square"); continue; }
         z.broken = true; burst(z.x + 6, z.y + 7, "#9aa4b4", 12);
       }
+      if (hero === 1 && !isBoss(z) && !z.frozen && p.beamTier === 0 && z.type !== "bat") { // hielo: primero congela
+        z.frozen = 240; z.vx = z.vx || .4; burst(z.x + z.w / 2, z.y + z.h / 2, "#cfe8ff", 10); beep(1500, .15, "triangle", 2400); continue;
+      }
+      if (z.frozen) { z.frozen = 0; burst(z.x + z.w / 2, z.y + z.h / 2, "#e8f6ff", 16, 4); beep(1800, .12, "square", 400); } // se rompe en pedazos
       damage(z, TIER.dmg[p.beamTier]);
     }
   } else { p.ray = null; p.zone = null; }
@@ -962,6 +977,11 @@ function drawZombie(z, i) {
   else if (z.type === "bat") drawBat(z, x, y, i);
   else drawSmall(z, i, x, y + bob, f, s);
   g.globalAlpha = 1;
+  if (z.frozen > 0) { // bloque de hielo
+    const blink = z.frozen < 60 && (z.frozen >> 3) % 2;
+    g.globalAlpha = blink ? .25 : .5; R(x - 2, y - 2, z.w + 4, z.h + 3, "#bfe0ff"); g.globalAlpha = .9;
+    R(x - 2, y - 2, z.w + 4, 1, "#ffffff"); R(x - 2, y - 2, 1, z.h + 3, "#ffffff"); R(x + 2, y + 2, 2, 1, "#ffffff"); g.globalAlpha = 1;
+  }
 }
 function drawPlayer() {
   const p = player; if (p.dead) return;
@@ -974,21 +994,25 @@ function drawPlayer() {
     if (x2) for (let k = 0; k < 3; k++) { const a = time * .15 + k * 2.1; R(6 + Math.cos(a) * 9, 7 + Math.sin(a) * 9, 1, 1, "#ffd0f0"); } // chispas alrededor
   }
   const P = (dx, dy, w, h, c) => R(f > 0 ? x + dx : x + 12 - dx - w, y + dy, w, h, c); // dibuja espejado según hacia dónde mira
+  const ice = hero === 1, C = ice // paleta de cada personaje
+    ? { coat: "#3a6ab8", coatL: "#e8f0ff", coatD: "#24488a", tail: ["#e8f0ff", "#c8d8f0"], legs: "#2a2a4a", boots: "#d0e0f0", hood: "#e8f0ff", hoodL: "#ffffff", eyes: ["#9ad0ff", "#3a7aff", "#7a5aff"] }
+    : { coat: "#1f7a7a", coatL: "#2a9a9a", coatD: "#145555", tail: ["#ff8a3d", "#e2672a"], legs: "#2b2340", boots: "#5a3a2a", hood: "#1f7a7a", hoodL: "#2a9a9a", eyes: ["#7ff5ff", "#ffd84a", "#ff5ac8"] };
   if (!air) { g.globalAlpha = .35; R(x + 1, y + 14, 10, 1, "#000"); g.globalAlpha = 1; }
-  const len = 4 + Math.min(5, Math.abs(p.vx) * 2.5) + (air ? 2 : 0); // bufanda que flamea
-  for (let k = 0; k < len; k++) P(1 - k, 6 + Math.round(Math.sin(time * .3 - k * .7) * (k / 3)) + (air ? -1 : 0), 1, 2, k % 2 ? "#ff8a3d" : "#e2672a");
-  if (air) { P(3, 11, 3, 2, "#2b2340"); P(7, 10, 3, 2, "#2b2340"); P(3, 13, 3, 1, "#5a3a2a"); P(8, 12, 3, 1, "#5a3a2a"); }
-  else { const a = run && s > 0, b = run && s <= 0; P(a ? 2 : 3, 11, 3, 2, "#2b2340"); P(b ? 8 : 7, 11, 3, 2, "#2b2340"); P(a ? 1 : 3, 13, 4, 1, "#5a3a2a"); P(b ? 8 : 7, 13, 4, 1, "#5a3a2a"); }
-  P(2, 7, 8, 4, "#1f7a7a"); P(2, 7, 8, 1, "#2a9a9a"); P(5, 8, 1, 3, "#145555"); P(2, 10, 8, 1, "#145555");
+  const len = 4 + Math.min(5, Math.abs(p.vx) * 2.5) + (air ? 2 : 0); // bufanda (Chispa) o trenza (Escarcha) que flamea
+  for (let k = 0; k < len; k++) P(1 - k, (ice ? 2 + k : 6) + Math.round(Math.sin(time * .3 - k * .7) * (k / 3)) + (air ? -1 : 0), ice && k === len - 1 ? 2 : 1, 2, C.tail[k % 2]);
+  if (air) { P(3, 11, 3, 2, C.legs); P(7, 10, 3, 2, C.legs); P(3, 13, 3, 1, C.boots); P(8, 12, 3, 1, C.boots); }
+  else { const a = run && s > 0, b = run && s <= 0; P(a ? 2 : 3, 11, 3, 2, C.legs); P(b ? 8 : 7, 11, 3, 2, C.legs); P(a ? 1 : 3, 13, 4, 1, C.boots); P(b ? 8 : 7, 13, 4, 1, C.boots); }
+  P(2, 7, 8, 4, C.coat); P(2, 7, 8, 1, C.coatL); P(5, 8, 1, 3, C.coatD); P(2, 10, 8, 1, ice ? C.coatL : C.coatD);
   const arm = run && s > 0 ? 1 : 0;
-  if (big) { P(1, 7, 10, 2, "#1f7a7a"); P(4, 9, 4, 1, "#145555"); P(7, 7 + arm, 4, 3, "#f0c8a0"); P(8, 7 + arm, 2, 1, "#ffe0c8"); P(9, 9 + arm, 1, 1, "#c07a6a"); P(10, 9 + arm, 2, 2, "#e8b890"); P(0, 8, 2, 3, "#e8b890"); }
-  else { P(7, 8 + arm, 3, 2, "#1f7a7a"); P(10, 8 + arm, 1, 2, "#f0c8a0"); }
-  P(2, 6, 8, 2, "#ff8a3d");
-  P(2, 0, 8, 6, "#1f7a7a"); P(4, -1, 5, 1, "#1f7a7a"); P(3, 0, 6, 1, "#2a9a9a"); P(5, 2, 5, 4, "#f0c8a0"); P(5, 2, 5, 1, "#145555");
+  if (big) { P(1, 7, 10, 2, C.coat); P(4, 9, 4, 1, C.coatD); P(7, 7 + arm, 4, 3, "#f0c8a0"); P(8, 7 + arm, 2, 1, "#ffe0c8"); P(9, 9 + arm, 1, 1, "#c07a6a"); P(10, 9 + arm, 2, 2, "#e8b890"); P(0, 8, 2, 3, "#e8b890"); }
+  else { P(7, 8 + arm, 3, 2, C.coat); P(10, 8 + arm, 1, 2, "#f0c8a0"); }
+  P(2, 6, 8, 2, ice ? C.coatL : "#ff8a3d");
+  P(2, 0, 8, 6, C.hood); P(4, -1, 5, 1, C.hood); P(3, 0, 6, 1, C.hoodL); P(5, 2, 5, 4, "#f0c8a0"); P(5, 2, 5, 1, ice ? C.hood : C.coatD);
+  if (ice) { P(2, 1, 3, 5, C.hood); P(9, 1, 1, 1, "#9ad0ff"); } // pelo largo y un broche de hielo
   const glow = p.beam > 0 ? .9 : .35 + Math.sin(time * .1) * .12;
-  g.globalAlpha = glow; P(6, 2, 6, 3, x2 ? "#ff5ac8" : big ? "#ffd84a" : "#7ff5ff"); g.globalAlpha = 1;
+  g.globalAlpha = glow; P(6, 2, 6, 3, C.eyes[p.tier]); g.globalAlpha = 1;
   P(6, 3, 1, 1, big ? "#fff6c0" : "#e8ffff"); P(8, 3, 1, 1, big ? "#fff6c0" : "#e8ffff");
-  if (x2) { P(1, 6, 10, 1, "#1f7a7a"); P(7, 6, 1, 1, "#c07a6a"); } P(7, 5, 2, 1, big ? "#fff" : "#c08a70");
+  if (x2) { P(1, 6, 10, 1, C.coat); P(7, 6, 1, 1, "#c07a6a"); } P(7, 5, 2, 1, big ? "#fff" : "#c08a70");
   if (big) g.restore();
 }
 function drawWater() { // el agua se dibuja encima del personaje para que se vea sumergido
@@ -1010,7 +1034,7 @@ function drawShield() {
 function drawBeam() {
   const p = player; if (!p.ray || p.beam <= 0) return;
   const r = p.ray, x = r.x - Math.floor(cam), start = p.beamDir > 0 ? x : x + r.w, end = p.beamDir > 0 ? x + r.w : x, B = p.beamBig;
-  const [c1, c2, c3] = [["#3fd9ff", "#7ff5ff", "#bff8ff"], ["#ff7a1a", "#ffd84a", "#fff6c0"], ["#ff2a8a", "#ff9ae0", "#fff0ff"]][p.beamTier], cy = r.y + (r.h >> 1), k = p.beamTier + 1, j = B ? Math.round(Math.sin(time * .9) * k) : 0;
+  const [c1, c2, c3] = (hero === 1 ? [["#3a7aff", "#9ad0ff", "#f0faff"], ["#2a5aff", "#bfe0ff", "#ffffff"], ["#7a5aff", "#cfc0ff", "#ffffff"]] : [["#3fd9ff", "#7ff5ff", "#bff8ff"], ["#ff7a1a", "#ffd84a", "#fff6c0"], ["#ff2a8a", "#ff9ae0", "#fff0ff"]])[p.beamTier], cy = r.y + (r.h >> 1), k = p.beamTier + 1, j = B ? Math.round(Math.sin(time * .9) * k) : 0;
   g.globalCompositeOperation = "lighter";
   g.globalAlpha = .16; R(x, cy - 5 * k + j, r.w, 11 * k, c1);
   g.globalAlpha = .45; R(x, cy - 2 * k, r.w, 5 * k, c1);
@@ -1071,8 +1095,9 @@ function drawTitle() {
   g.font = "bold 12px ui-monospace, monospace"; g.fillStyle = sel === 4 ? "#ff6a4a" : "#7cc456"; g.fillText(L0.name, W / 2, 146);
   g.font = "11px ui-monospace, monospace"; g.fillStyle = "#cfc8e8";
   g.fillText(best ? `Mejor: ${best.st} de 3 estrellas · ${clock(best.t)} (meta ${clock(PAR[sel] * 60)})` : `Tiempo meta ${clock(PAR[sel] * 60)}`, W / 2, 162);
-  if (records[0]) { g.fillStyle = "#f2c94c"; g.fillText(`Récord: ${records[0].n} ${records[0].s}`, W / 2, 184); }
-  g.fillStyle = "#f3efe6"; g.fillText(unlocked > 1 ? "◀ ▶ elegí nivel · ▲ o tocá para jugar" : "▲ o tocá para jugar", W / 2, 210);
+  if (records[0]) { g.fillStyle = "#f2c94c"; g.fillText(`Récord: ${records[0].n} ${records[0].s}`, W / 2, 180); }
+  g.fillStyle = hero === 1 ? "#9ad0ff" : "#7ff5ff"; g.font = "bold 11px ui-monospace, monospace"; g.fillText(`${HEROES[hero].name} · ${HEROES[hero].power}`, W / 2, 196); g.font = "11px ui-monospace, monospace";
+  g.fillStyle = "#f3efe6"; g.fillText(unlocked > 1 ? "◀ ▶ nivel · ⚡ personaje · ▲ jugar" : "⚡ cambiar personaje · ▲ o tocá para jugar", W / 2, 214);
   g.textAlign = "left";
 }
 function draw() {
@@ -1122,6 +1147,7 @@ function press(k) { // empezar, seguir o reintentar
   if (naming) return true;
   if (mode === "title") {
     if (k === "left" || k === "right") { sel = Math.max(0, Math.min(unlocked - 1, sel + (k === "left" ? -1 : 1))); beep(660, .05, "square"); return true; }
+    if (k === "fire") { setHero(1 - hero); beep(hero ? 1500 : 900, .12, "triangle", hero ? 2400 : 1400); return true; }
     newGame(urlLevel ? urlLevel - 1 : sel); return true;
   }
   if (mode === "over") {
@@ -1148,6 +1174,7 @@ addEventListener("keydown", (e) => {
   const k = map_k[e.key]; if (e.repeat) { if (k) e.preventDefault(); return; }
   audioInit();
   if (e.key === "m" || e.key === "M") { toggleMusic(); return; }
+  if (mode === "title" && (e.key === "c" || e.key === "C")) { setHero(1 - hero); return; }
   if (mode === "shop" && (e.key === "ArrowDown" || e.key === "s" || e.key === "S")) { shopSel = (shopSel + 1) % SHOP.length; return; }
   if (mode === "shop" && e.key === "ArrowUp") { shopSel = (shopSel - 1 + SHOP.length) % SHOP.length; return; }
   if (mode === "title" && /^[1-5]$/.test(e.key) && +e.key <= unlocked) { newGame(+e.key - 1); return; } // elegir nivel ya desbloqueado
