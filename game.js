@@ -1,7 +1,7 @@
 "use strict";
 // Zombilandia: platformer de zombies en canvas, sin librerías. Personajes y arte propios (rects de píxel).
 // 5 niveles: cementerio, ciudad en ruinas, pantano tóxico, laboratorio y la guarida del Rey Zombi (jefe final).
-const VERSION = "v11"; // subir en cada publicación (también en index.html)
+const VERSION = "v12"; // subir en cada publicación (también en index.html)
 const T = 16, H = 240, ROWS = 15, COLS = 190;
 let W = 480, cache = {};
 const cv = document.getElementById("c"), g = cv.getContext("2d");
@@ -137,7 +137,33 @@ function loadLevel(i) {
   if (i + 1 > unlocked) { unlocked = i + 1; try { localStorage.setItem("zombilandia-nivel", unlocked); } catch {} }
 }
 function lockArena() { arenaLocked = true; fill(155, 156, 2, 12, "#"); shake = 20; beep(90, .8, "sawtooth", 40); }
-function newGame(i) { bossCheck = null; player = null; score = 0; lives = 3; brains = 0; loadLevel(i); mode = "play"; }
+// ---------- Récords ----------
+// Top 5 guardado en el celu. Una partida ocupa un solo lugar: si volvés a perder en la misma partida, se actualiza.
+let records = [], runId = 0, naming = false, lastName = "";
+try { records = JSON.parse(localStorage.getItem("zombilandia-records") || "[]"); lastName = localStorage.getItem("zombilandia-nombre") || ""; } catch {}
+const saveRecords = () => { try { localStorage.setItem("zombilandia-records", JSON.stringify(records)); } catch {} };
+function recordScore() {
+  if (score <= 0) return;
+  const mine = records.find((r) => r.id === runId);
+  if (mine) { if (score > mine.s) { mine.s = score; mine.lv = levelIdx + 1; records.sort((a, b) => b.s - a.s); saveRecords(); } return; }
+  if (records.length >= 5 && score <= records.at(-1).s) return;
+  const entry = { id: runId, n: lastName || "???", s: score, lv: levelIdx + 1 };
+  records.push(entry); records.sort((a, b) => b.s - a.s); records = records.slice(0, 5); saveRecords();
+  if (!records.includes(entry)) return;
+  naming = true; // pedir iniciales
+  const box = document.getElementById("nm"), inp = document.getElementById("nmIn");
+  box.hidden = false; inp.value = lastName; keys.left = keys.right = keys.jump = keys.fire = false;
+  setTimeout(() => inp.focus(), 50);
+  const done = () => {
+    const n = (inp.value || "???").toUpperCase().replace(/[^A-Z0-9ÑÁÉÍÓÚ]/g, "").slice(0, 3) || "???";
+    entry.n = lastName = n; saveRecords(); try { localStorage.setItem("zombilandia-nombre", n); } catch {}
+    box.hidden = true; inp.blur(); setTimeout(() => { naming = false; }, 250);
+  };
+  document.getElementById("nmOk").onclick = done;
+  inp.onkeydown = (e) => { if (e.key === "Enter") { e.preventDefault(); done(); } e.stopPropagation(); };
+}
+const recLines = (n) => records.slice(0, n).map((r, i) => `${i + 1}. ${r.n.padEnd(3)}  ${String(r.s).padStart(6)}  N${r.lv}`);
+function newGame(i) { runId = Date.now(); player = null; score = 0; lives = 3; brains = 0; loadLevel(i); mode = "play"; }
 loadLevel(0);
 
 function collideX(o) {
@@ -286,7 +312,7 @@ function shrink(to = 0) {
   const p = player; if (p.tier > to) setTier(to);
   Object.assign(p, { want: to, growing: false, power: to > 0 ? 1 : 0 }); beep(500, .3, "triangle", 150);
 }
-function gameOver() { mode = "over"; player.dead = 1; beep(200, .6, "sawtooth", 40); }
+function gameOver() { mode = "over"; player.dead = 1; beep(200, .6, "sawtooth", 40); recordScore(); }
 function hurt(src) {
   const p = player; if (p.inv > 0 || p.dead) return;
   const lvl = Math.max(p.tier, p.want);
@@ -390,6 +416,7 @@ function update() {
   if (p.x > goalX * T && (!L.boss || bossDead)) {
     score += lives * 100 + 500; fanfare();
     mode = levelIdx === LEVELS.length - 1 ? "won" : "clear";
+    if (mode === "won") recordScore();
   }
   for (const q of parts) { q.x += q.vx; q.y += q.vy; q.vy += .15; q.life--; }
   parts = parts.filter((q) => q.life > 0);
@@ -791,10 +818,10 @@ function draw() {
   g.fillStyle = grads().vig; g.fillRect(0, 0, W, H);
   hud(); g.restore();
   g.font = "8px ui-monospace, monospace"; g.textAlign = "right"; g.textBaseline = "bottom"; g.globalAlpha = .6; text(VERSION, W - 3, H - 2, "#cfc8e8"); g.globalAlpha = 1; g.textAlign = "left";
-  if (mode === "title") panel("ZOMBILANDIA", ["Saltá sobre los zombis o usá el rayo.", "Doble salto: saltá otra vez en el aire.", "5 mundos y un jefe final.", "", "Tocá o apretá una tecla para empezar", ...(unlocked > 1 ? [`o tocá ⚡ para seguir desde el nivel ${unlocked}`] : [])], "#7cc456");
+  if (mode === "title") panel("ZOMBILANDIA", ["Saltá sobre los zombis o usá el rayo.", "Doble salto: saltá otra vez en el aire.", "5 mundos y un jefe final.", records[0] ? `Récord: ${records[0].n} ${records[0].s}` : "", "Tocá o apretá una tecla para empezar", ...(unlocked > 1 ? [`o tocá ⚡ para seguir desde el nivel ${unlocked}`] : [])], "#7cc456");
   else if (mode === "clear") panel("¡NIVEL SUPERADO!", [L.name, `Puntos: ${score}  ·  Cerebros: ${brains}`, "", `Sigue: ${LEVELS[levelIdx + 1].name}`, "Tocá o apretá una tecla para seguir"], "#f2c94c");
-  else if (mode === "over") panel("TE COMIERON", [`Nivel ${levelIdx + 1}: ${L.name}`, "", "Tocá o apretá una tecla", bossCheck && bossCheck.level === levelIdx ? "para volver a pelear con el jefe" : "para reintentar el nivel"], "#ff5a5a");
-  else if (mode === "won") panel("¡SOBREVIVISTE!", ["Derrotaste al Rey Zombi.", `Puntos: ${score}  ·  Cerebros: ${brains}`, "", "Tocá o apretá una tecla para volver"], "#f2c94c");
+  else if (mode === "over") panel("TE COMIERON", [`Nivel ${levelIdx + 1}: ${L.name}  ·  ${score} puntos`, ...recLines(3), "", bossCheck && bossCheck.level === levelIdx ? "Tocá para volver a pelear con el jefe" : "Tocá para reintentar el nivel"], "#ff5a5a");
+  else if (mode === "won") panel("¡SOBREVIVISTE!", [`Derrotaste al Rey Zombi · ${score} puntos`, "", ...recLines(5), "Tocá para volver"], "#f2c94c");
 }
 
 // ---------- Bucle (60 fps fijos) ----------
@@ -808,6 +835,7 @@ requestAnimationFrame(frame);
 
 // ---------- Entrada ----------
 function press(k) { // empezar, seguir o reintentar
+  if (naming) return true;
   if (mode === "title") { newGame(urlLevel ? urlLevel - 1 : k === "fire" && unlocked > 1 ? unlocked - 1 : 0); return true; }
   if (mode === "over") {
     lives = 3;
@@ -824,6 +852,7 @@ function press(k) { // empezar, seguir o reintentar
 }
 const map_k = { ArrowLeft: "left", a: "left", A: "left", ArrowRight: "right", d: "right", D: "right", ArrowUp: "jump", w: "jump", W: "jump", " ": "jump", x: "fire", X: "fire", f: "fire", F: "fire", j: "fire", J: "fire", Shift: "fire", z: "fire", Z: "fire" };
 addEventListener("keydown", (e) => {
+  if (naming) return;
   const k = map_k[e.key]; if (e.repeat) { if (k) e.preventDefault(); return; }
   audioInit();
   if (e.key === "m" || e.key === "M") { toggleMusic(); return; }
