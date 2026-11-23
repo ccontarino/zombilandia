@@ -99,7 +99,7 @@ const DEFAULT_RELAY = "wss://zombilandia.ccontarino.workers.dev"; // dirección 
     switch (m.t) {
       case "join": peerJoin(); break;
       case "left": if (m.who === "guest") peerGone("El invitado se desconectó"); break;
-      case "hi": lvlDirty = true; net.gskin = m.skin | 0; if (players[1]) players[1].skin = net.gskin; break;
+      case "hi": lvlDirty = true; net.gskin = m.skin | 0; net.ghero = m.hero === 1 ? 1 : 0; if (players[1]) { players[1].skin = net.gskin; players[1].hero = net.ghero; } break;
       case "i":
         keys2.left = !!m.l; keys2.right = !!m.r; keys2.jump = !!m.j; keys2.fire = !!m.f; if (m.tj) tap2.jump = true; if (m.tf) tap2.fire = true; break;
       case "p": if (net.peer && !net.paused) press(m.k); break;
@@ -205,7 +205,7 @@ const DEFAULT_RELAY = "wss://zombilandia.ccontarino.workers.dev"; // dirección 
     ws = sock;
     sock.onopen = () => {
       opened = true; retry = 0; lastRx = performance.now(); note = ""; lock(); try { localStorage.setItem("zombilandia-sala", JSON.stringify({ role, code: c, t: Date.now() })); } catch {}
-      if (role === "guest") { net.peer = true; nPlayers = 2; if (!gotSnap) { mode = "title"; loadLevel(0); } send({ t: "hi", skin: CFG.skin || 0 }); setMsg(`Conectado a la sala ${c}. Esperando al anfitrión…`); showOn(false); }
+      if (role === "guest") { net.peer = true; nPlayers = 2; if (!gotSnap) { mode = "title"; loadLevel(0); } send({ t: "hi", skin: CFG.skin || 0, hero }); setMsg(`Conectado a la sala ${c}. Esperando al anfitrión…`); showOn(false); }
       else { $("onMenu").hidden = true; $("onSala").hidden = false; $("onCode").textContent = c; $("onLink").value = shareLink(c); setMsg("Mandale el link a tu amigo y esperá a que entre."); }
     };
     sock.onmessage = (e) => { lastRx = performance.now(); let m; try { m = JSON.parse(e.data); } catch { return; } if (role === "host") hostMsg(m); else guestMsg(m); };

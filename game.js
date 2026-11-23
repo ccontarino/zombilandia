@@ -1,7 +1,7 @@
 "use strict";
 // Zombilandia: platformer de zombies en canvas, sin librerías. Personajes y arte propios (rects de píxel).
 // 5 niveles: cementerio, ciudad en ruinas, pantano tóxico, laboratorio y la guarida del Rey Zombi (jefe final).
-const VERSION = "v54"; // subir en cada publicación (también en index.html)
+const VERSION = "v55"; // subir en cada publicación (también en index.html)
 // ---------- Métricas de uso (Umami, anónimas, sin cookies) ----------
 // Pegá acá el "Website ID" de tu sitio en Umami; vacío = no se manda nada. Respeta "No rastrear" del navegador y solo cuenta en el sitio publicado.
 const UMAMI = { id: "4c40559c-a7e6-4a1f-8fb1-6d289f3ffbcb", src: "https://cloud.umami.is/script.js", domains: "ccontarino.github.io" };
@@ -242,7 +242,7 @@ function unlock(id) {
 const addKill = () => { stats.kills++; unlock("primera"); if (stats.kills >= 50) unlock("cazador"); if (stats.kills % 5 === 0) try { localStorage.setItem("zombilandia-stats", JSON.stringify(stats)); } catch {} };
 function mkPlayer(i, k) {
   const keep = k?.keep || 0, x = 40 + i * 14;
-  return { x, y: 150, vx: 0, vy: 0, w: 10, h: 14, face: 1, ground: false, coyote: 0, jumps: 0, cd: 0, beam: 0, beamDir: 1, ray: null, firePrev: false, shot: 0, inv: 0, dead: 0, step: 0, springT: 0, big: false, tier: 0, want: keep, growing: keep > 0, power: keep > 0 ? 1 : 0, beamBig: false, beamTier: 0, shield: !!k?.shield, hero: i === 0 ? hero : 1 - hero, skin: i === 0 ? (CFG.skin || 0) : (net.gskin || 0), safe: { x, y: 150 } };
+  return { x, y: 150, vx: 0, vy: 0, w: 10, h: 14, face: 1, ground: false, coyote: 0, jumps: 0, cd: 0, beam: 0, beamDir: 1, ray: null, firePrev: false, shot: 0, inv: 0, dead: 0, step: 0, springT: 0, big: false, tier: 0, want: keep, growing: keep > 0, power: keep > 0 ? 1 : 0, beamBig: false, beamTier: 0, shield: !!k?.shield, hero: i === 0 ? hero : (net.ghero ?? 1 - hero), skin: i === 0 ? (CFG.skin || 0) : (net.gskin || 0), safe: { x, y: 150 } };
 }
 // Punto de control: a mitad del nivel. Si te comen después de pasarlo, reintentás desde ahí.
 const cpGot = {}; let cpMemo = null;
@@ -473,6 +473,11 @@ const SONGS = [
   SONG(41, [0, 3, 5, 6, 7, 10], 98, "triangle", 37),    // pantano
   SONG(47, [0, 1, 5, 7, 8], 122, "square", 41),         // laboratorio
   SONG(40, [0, 1, 4, 5, 7, 8, 10], 136, "sawtooth", 53), // guarida
+  SONG(50, [0, 2, 4, 7, 9], 104, "triangle", 101),      // montaña nevada
+  SONG(43, [0, 1, 4, 5, 7, 8, 11], 120, "square", 113), // desierto
+  SONG(41, [0, 2, 3, 5, 7, 10], 134, "triangle", 127),  // selva
+  SONG(48, [0, 4, 7, 9, 12], 150, "square", 139),       // parque
+  SONG(46, [0, 3, 5, 7, 10], 86, "triangle", 151),      // luna
 ];
 const BOSS_SONG = SONG(38, [0, 1, 3, 6, 7], 152, "sawtooth", 67, true), TITLE_SONG = SONG(45, [0, 3, 5, 7, 10], 92, "triangle", 79);
 function compose(s) { // 4 compases de 16 pasos: un motivo que se repite sobre una progresión, más bajo y batería
@@ -1749,7 +1754,7 @@ function importProgress(s) {
 }
 function setupCfg() {
   const box = document.getElementById("cfg"); if (!box) return;
-  const sync = () => box.querySelectorAll(".seg").forEach((s) => { const k = s.dataset.k, cur = k === "mus" ? (musicOn ? "1" : "0") : String(CFG[k]); s.querySelectorAll("button").forEach((b) => b.classList.toggle("on", b.dataset.v === cur)); });
+  const sync = () => box.querySelectorAll(".seg").forEach((s) => { const k = s.dataset.k, cur = k === "mus" ? (musicOn ? "1" : "0") : k === "hero" ? String(hero) : String(CFG[k]); s.querySelectorAll("button").forEach((b) => b.classList.toggle("on", b.dataset.v === cur)); });
   const open = (on) => { box.hidden = !on; if (on) { sync(); buildSkin(); buildAch(); if (!net.role && mode === "play") paused = true; } else paused = false; };
   const skRow = document.getElementById("cfgSkin"), achBox = document.getElementById("cfgAch");
   const buildSkin = () => { if (!skRow) return; skRow.innerHTML = ""; SKINS.forEach((n, i) => { const b = document.createElement("button"); b.dataset.v = i; b.textContent = skinOpen(i) ? n : "🔒"; b.disabled = !skinOpen(i); b.title = skinOpen(i) ? n : "Se desbloquea con un logro"; b.classList.toggle("on", (CFG.skin || 0) === i); b.onclick = () => { CFG.skin = i; saveCfg(); if (players[0]) players[0].skin = i; buildSkin(); }; skRow.appendChild(b); }); };
@@ -1759,7 +1764,7 @@ function setupCfg() {
   document.getElementById("cfgMenu").onclick = () => { open(false); toMenu(); };
   box.querySelectorAll(".seg button").forEach((b) => b.onclick = () => {
     const k = b.parentElement.dataset.k, v = b.dataset.v;
-    if (k === "mus") { if ((v === "1") !== musicOn) toggleMusic(); } else { CFG[k] = k === "gfx" ? v : +v; if (k === "gfx" && v === "auto") fxLvl = 2; saveCfg(); if (k === "pad") applyPad(); }
+    if (k === "mus") { if ((v === "1") !== musicOn) toggleMusic(); } else if (k === "hero") setHero(+v); else { CFG[k] = k === "gfx" ? v : +v; if (k === "gfx" && v === "auto") fxLvl = 2; saveCfg(); if (k === "pad") applyPad(); }
     sync();
   });
   const code = document.getElementById("cfgCode"), msg = document.getElementById("cfgMsg");
