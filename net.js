@@ -80,11 +80,12 @@ const DEFAULT_RELAY = "wss://zombilandia.ccontarino.workers.dev"; // dirección 
     showOn(false);
   }
   function hostMsg(m) {
+    if (!net.peer && m.t !== "left" && m.t !== "join") peerJoin(); // el invitado volvió (por ejemplo, tras salir un rato de la pestaña)
     switch (m.t) {
       case "join": peerJoin(); break;
       case "left": if (m.who === "guest") peerGone("El invitado se desconectó"); break;
       case "hi": lvlDirty = true; break;
-      case "i": if (!net.peer) { net.peer = true; net.rec = net.rec || []; note = ""; }
+      case "i":
         keys2.left = !!m.l; keys2.right = !!m.r; keys2.jump = !!m.j; keys2.fire = !!m.f; if (m.tj) tap2.jump = true; if (m.tf) tap2.fire = true; break;
       case "p": if (net.peer && !net.paused) press(m.k); break;
       case "shop": if (net.peer && mode === "shop" && SHOP[m.i]) { shopSel = m.i; shopAct(m.i); } break;
@@ -146,6 +147,7 @@ const DEFAULT_RELAY = "wss://zombilandia.ccontarino.workers.dev"; // dirección 
     const p = players[1]; if (p && p.x !== undefined) cam = Math.max(0, Math.min(COLS * T - W, p.x - W / 2 + 20));
     if (gotSnap && performance.now() - lastRx > 3500) note = "Sin señal del anfitrión…"; else if (gotSnap && note.startsWith("Sin señal")) note = "";
   }
+  setInterval(() => { if (net.role === "guest") send({ t: "ka" }); }, 1000); // señal de vida aunque la pestaña esté en segundo plano
   net.step = () => {
     if (!net.role) return;
     tickN++;
