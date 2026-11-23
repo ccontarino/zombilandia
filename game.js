@@ -1,12 +1,12 @@
 "use strict";
 // Zombilandia: platformer de zombies en canvas, sin librerías. Personajes y arte propios (rects de píxel).
 // 5 niveles: cementerio, ciudad en ruinas, pantano tóxico, laboratorio y la guarida del Rey Zombi (jefe final).
-const VERSION = "v32"; // subir en cada publicación (también en index.html)
+const VERSION = "v33"; // subir en cada publicación (también en index.html)
 const T = 16, H = 240, ROWS = 15, COLS = 215;
 let W = 480, cache = {};
-const cv = document.getElementById("c"), g = cv.getContext("2d");
+const cv = document.getElementById("c"); let g = cv.getContext("2d"); const MAINCTX = g; let SC = 1;
 function fit() { // en celu vertical el mundo se ve más angosto, así los sprites quedan grandes
-  W = innerWidth < innerHeight ? 300 : 480; cv.width = W; cv.height = H; cv.style.aspectRatio = W + " / " + H; g.imageSmoothingEnabled = false; cache = {};
+  W = innerWidth < innerHeight ? 300 : 480; const css = Math.min(innerWidth, (innerHeight - 24) * W / H); SC = Math.max(2, Math.min(4, Math.round(css * (devicePixelRatio || 1) / W))); cv.width = W * SC; cv.height = H * SC; cv.style.aspectRatio = W + " / " + H; g.imageSmoothingEnabled = true; g.imageSmoothingQuality = "high"; cache = {};
 }
 fit(); addEventListener("resize", fit);
 
@@ -705,7 +705,7 @@ function update() {
 }
 
 // ---------- Dibujo ----------
-const R = (x, y, w, h, c) => { g.fillStyle = c; g.fillRect(Math.round(x), Math.round(y), w, h); };
+const R = (x, y, w, h, c) => { g.fillStyle = c; const x0 = Math.round(x * SC) / SC, y0 = Math.round(y * SC) / SC; g.fillRect(x0, y0, Math.round((x + w) * SC) / SC - x0, Math.round((y + h) * SC) / SC - y0); };
 const stars = Array.from({ length: 80 }, (_, i) => [rnd(i) * 640, rnd(i + 99) * 130, rnd(i + 7)]);
 function grads() {
   if (cache.W === W && cache.th === TH) return cache;
@@ -1301,6 +1301,43 @@ function buildEdUI() {
   document.getElementById("edExit").onclick = () => { saveEd(); showEd(false); mode = "title"; loadLevel(0); };
   const eb = document.getElementById("edit"); if (eb) eb.onclick = () => { if (mode === "title" && !net.role) enterEditor(edData); };
 }
+// ---------- Motor gráfico: fondo con profundidad de campo, bloom, gradación de color y rayos de luz ----------
+let bgC, bgG, b1, b1g, b2, b2g, b3, b3g, fxKey = "";
+const mk = (w, h) => { const c = document.createElement("canvas"); c.width = Math.max(1, Math.ceil(w)); c.height = Math.max(1, Math.ceil(h)); return [c, c.getContext("2d")]; };
+function fxSize() {
+  fxKey = W + "x" + SC;
+  [bgC, bgG] = mk(W * SC / 2, H * SC / 2); [b1, b1g] = mk(W * SC / 4, H * SC / 4); [b2, b2g] = mk(W * SC / 4, H * SC / 4); [b3, b3g] = mk(W * SC / 10, H * SC / 10);
+  for (const x of [bgG, b1g, b2g, b3g]) { x.imageSmoothingEnabled = true; x.imageSmoothingQuality = "high"; }
+}
+function drawBgSoft() { // el fondo se dibuja a media resolución y se estira suave: se ve desenfocado, como si estuviera lejos
+  if (fxKey !== W + "x" + SC) fxSize();
+  const main = g; g = bgG; g.setTransform(SC / 2, 0, 0, SC / 2, 0, 0); drawBg(); g = main;
+  g.save(); g.setTransform(1, 0, 0, 1, 0, 0); g.drawImage(bgC, 0, 0, cv.width, cv.height); g.restore();
+}
+const GRADE = { cemetery: ["#5a6cc0", .2], city: ["#c08a5a", .16], swamp: ["#5ac078", .2], lab: ["#5ab8c8", .16], lair: ["#d04a20", .24] };
+function postFX() {
+  const dw = cv.width, dh = cv.height;
+  g.save(); g.setTransform(1, 0, 0, 1, 0, 0);
+  // bloom: me quedo con lo más brillante (elevando al cuadrado), lo desenfoco y lo sumo
+  b1g.globalCompositeOperation = "source-over"; b1g.drawImage(cv, 0, 0, b1.width, b1.height);
+  b2g.globalCompositeOperation = "source-over"; b2g.drawImage(b1, 0, 0); b2g.globalCompositeOperation = "multiply"; b2g.drawImage(b1, 0, 0); b2g.drawImage(b2, 0, 0);
+  b3g.drawImage(b2, 0, 0, b3.width, b3.height);
+  g.globalCompositeOperation = "lighter"; g.globalAlpha = .65; g.drawImage(b3, 0, 0, dw, dh); g.globalAlpha = .35; g.drawImage(b2, 0, 0, dw, dh);
+  // gradación de color según el mundo
+  const [col, a] = GRADE[L?.theme] || GRADE.cemetery;
+  g.globalCompositeOperation = "soft-light"; g.globalAlpha = a * 2.2; g.fillStyle = col; g.fillRect(0, 0, dw, dh);
+  g.restore();
+}
+function godRays() { // haces de luz de la luna
+  if (!TH.moon || TH.indoor) return;
+  g.save(); g.globalCompositeOperation = "lighter";
+  for (let i = 0; i < 4; i++) {
+    const a = .045 + .02 * Math.sin(time * .01 + i * 1.7), x0 = W - 70, y0 = 46, ang = 1.9 + i * .22 + Math.sin(time * .004 + i) * .03, len = 260, wd = 28 + i * 10;
+    const gr = g.createLinearGradient(x0, y0, x0 + Math.cos(ang) * len, y0 + Math.sin(ang) * len); gr.addColorStop(0, hexA(TH.moon, a)); gr.addColorStop(1, hexA(TH.moon, 0));
+    g.fillStyle = gr; g.beginPath(); g.moveTo(x0, y0); g.lineTo(x0 + Math.cos(ang - .09) * len, y0 + Math.sin(ang - .09) * len); g.lineTo(x0 + Math.cos(ang + .09) * len, y0 + Math.sin(ang + .09) * len); g.fill();
+  }
+  g.restore();
+}
 // ---------- Efectos modernos: luces, sombras, partículas de ambiente, HUD de vidrio ----------
 const glowCache = {};
 function glow(x, y, r, col, a = .5) { // resplandor aditivo (la luz se suma sobre la escena)
@@ -1341,7 +1378,7 @@ function draw() {
   player = players[me()] || players[0];
   g.save();
   if (shake) g.translate(Math.round((Math.random() - .5) * 4), Math.round((Math.random() - .5) * 4));
-  drawBg(); drawMotes(); drawTiles(); drawItems();
+  drawBgSoft(); godRays(); drawMotes(); drawTiles(); drawItems();
   for (const z of zombies) shadowOf(z); for (const q of players) shadowOf(q);
   for (const f of falling) drawPlat(f.x - cam, f.y, -9, 0, .3);
   for (const m of movers) { // plataformas móviles
@@ -1358,7 +1395,7 @@ function draw() {
     g.globalAlpha = .3; g.fillStyle = s.col; g.beginPath(); g.arc(x, s.y, s.r + 3, 0, 7); g.fill(); g.globalAlpha = 1; g.beginPath(); g.arc(x, s.y, s.r, 0, 7); g.fill(); R(x - 1, s.y - 2, 1, 1, "#f0ffc0"); }
   for (const q of players) { drawPlayer(q); drawShield(q); drawBeam(q); } drawWater();
   for (const q of parts) { g.globalAlpha = Math.min(1, q.life / 20); R(q.x - cam, q.y, 2, 2, q.col); } g.globalAlpha = 1;
-  drawLights();
+  drawLights(); postFX();
   g.fillStyle = grads().vig; g.fillRect(0, 0, W, H);
   hud(); g.restore();
   g.font = "8px ui-monospace, monospace"; g.textAlign = "right"; g.textBaseline = "bottom"; g.globalAlpha = .6; text(VERSION, W - 3, H - 2, "#cfc8e8"); g.globalAlpha = 1; g.textAlign = "left";
@@ -1382,7 +1419,7 @@ let last = performance.now(), acc = 0;
 function frame(now) {
   acc += Math.min(100, now - last); last = now;
   while (acc >= 1000 / 60) { if (!net.paused && net.role !== "guest") update(); net.step(); acc -= 1000 / 60; }
-  draw(); musicTick(); requestAnimationFrame(frame);
+  g.setTransform(SC, 0, 0, SC, 0, 0); draw(); musicTick(); requestAnimationFrame(frame);
 }
 requestAnimationFrame(frame);
 
