@@ -1,7 +1,7 @@
 "use strict";
 // Zombilandia: platformer de zombies en canvas, sin librerías. Personajes y arte propios (rects de píxel).
 // 5 niveles: cementerio, ciudad en ruinas, pantano tóxico, laboratorio y la guarida del Rey Zombi (jefe final).
-const VERSION = "v33"; // subir en cada publicación (también en index.html)
+const VERSION = "v34"; // subir en cada publicación (también en index.html)
 const T = 16, H = 240, ROWS = 15, COLS = 215;
 let W = 480, cache = {};
 const cv = document.getElementById("c"); let g = cv.getContext("2d"); const MAINCTX = g; let SC = 1;
@@ -873,7 +873,7 @@ function drawDeco(x, y, k) {
   }
   else { R(x + 4, y + 12, 1, 4, "#3f6a2a"); R(x + 6, y + 10, 1, 6, "#4f8a35"); R(x + 8, y + 13, 1, 3, "#3f6a2a"); R(x + 10, y + 11, 1, 5, "#4f8a35"); }
 }
-function drawGround(px, py, x, y, r) {
+function drawGroundOld(px, py, x, y, r) {
   const [g1, g2, g3] = TH.grass, [d1, d2, d3, d4] = TH.dirt, top = map[y - 1]?.[x] !== "#", bottom = map[y + 1]?.[x] !== "#" && y < ROWS - 1;
   const th = L.theme;
   if (th === "city") {
@@ -896,7 +896,7 @@ function drawGround(px, py, x, y, r) {
     }
   }
 }
-function drawPlat(px, py, x, y, r) {
+function drawPlatOld(px, py, x, y, r) {
   const [p0, p1, p2] = TH.plat, th = L.theme;
   if (th === "city") { R(px, py, T, 3, p1); R(px, py + 13, T, 3, p0); for (let k = 0; k < 10; k++) { R(px + k + 2, py + 3 + k, 2, 1, p0); R(px + T - 4 - k, py + 3 + k, 2, 1, p0); } R(px, py + 2, T, 1, p2); }
   else if (th === "swamp") {
@@ -907,6 +907,38 @@ function drawPlat(px, py, x, y, r) {
   else if (th === "lair") { R(px, py, T, T, p0); R(px, py, T, 2, p1); R(px, py + 14, T, 2, p2); R(px + 7, py + 2, 1, 12, p2); if (r > .6) R(px + 3, py + 6, 1, 4, "#ff5a10"); }
   else { R(px, py, T, T, p0); R(px, py, T, 2, p1); R(px, py + T - 2, T, 2, p2); R(px, py + 7, T, 1, p2); R(px + 7, py + 2, 1, 5, p2); R(px + 3, py + 8, 1, 6, p2); R(px + 12, py + 8, 1, 6, p2); R(px + 1, py + 3, 5, 1, "#93503b"); R(px + 9, py + 3, 5, 1, "#93503b"); if (r > .6) R(px + 5, py + 12, 4, 2, "#4f7a3a"); }
 }
+// ---------- Texturas suaves (ver art.js) ----------
+const TEX = {};
+function tex(key, w, h, fn) {
+  const k = key + "|" + SC + "|" + L.theme;
+  let c = TEX[k]; if (c) return c;
+  const [cc, x] = mk(w * SC, h * SC); x.scale(SC, SC); x.imageSmoothingEnabled = true; fn(x); return (TEX[k] = cc);
+}
+function drawGround(px, py, x, y, r) {
+  const th = L.theme, top = map[y - 1]?.[x] !== "#", bottom = map[y + 1]?.[x] !== "#" && y < ROWS - 1, v = (r * 4) | 0, d = TH.dirt, gs = TH.grass;
+  let c, oy = 0, h = T;
+  if (th === "city") {
+    if (top) c = tex("ct" + v, T, T, (x) => { dirtArt(x, T, v, d); const gr = x.createLinearGradient(0, 0, 0, 4); gr.addColorStop(0, gs[0]); gr.addColorStop(.6, gs[1]); gr.addColorStop(1, gs[2]); x.fillStyle = gr; x.fillRect(0, 0, T, 4); x.fillStyle = "rgba(255,255,255,.35)"; x.fillRect(0, 0, T, .7); x.fillStyle = "rgba(0,0,0,.3)"; x.fillRect(0, 4, T, 1); });
+    else { const lit = [r > .82, r > .93]; c = tex("cf" + (+lit[0]) + (+lit[1]) + v, T, T, (x) => facadeArt(x, T, v, d, lit)); }
+  } else if (th === "lab") {
+    const ts = top && y > 1, bs = bottom; c = tex("lb" + (+ts) + (+bs) + v, T, T, (x) => panelArt(x, T, v, d, ts, bs));
+  } else if (th === "lair") {
+    const lava = r > .7; c = tex("lr" + (+top) + (+lava) + v, T, T, (x) => lairStoneArt(x, T, v, [d[1], d[3], d[2]], top, lava));
+  } else if (top) { oy = 6; h = T + 6; c = tex("gt" + v, T, T + 6, (x) => { x.translate(0, 6); dirtArt(x, T, v, d); grassArt(x, T, v, gs, 0, th === "swamp"); }); }
+  else c = tex("gf" + v, T, T, (x) => dirtArt(x, T, v + 4, [d[1], d[2], d[2], d[3]]));
+  g.drawImage(c, px, py - oy, T, h);
+}
+function drawPlat(px, py, x, y, r) {
+  const th = L.theme, v = (r * 4) | 0, P = TH.plat;
+  let c;
+  if (th === "city") c = tex("pc", T, T, (x) => girderArt(x, T, 0, P));
+  else if (th === "swamp") { const l = map[y]?.[x - 1] !== "=", rt = map[y]?.[x + 1] !== "="; c = tex("ps" + (+l) + (+rt) + v, T, T, (x) => plankArt(x, T, v, P, true, l, rt)); }
+  else if (th === "lab") c = tex("pl", T, T, (x) => gratingArt(x, T, 0, P));
+  else if (th === "lair") { const lava = r > .6; c = tex("pr" + (+lava) + v, T, T, (x) => lairStoneArt(x, T, v, P, true, lava)); }
+  else c = tex("pm" + v, T, T, (x) => brickArt(x, T, v, P, "#2a120c", .22));
+  g.drawImage(c, px, py, T, T);
+}
+function drawQuestion(px, py, shine) { g.drawImage(tex("q" + (+shine), T, T, (x) => questionArt(x, T, shine)), px, py, T, T); }
 function drawTiles() {
   const ox = Math.floor(cam), x0 = Math.max(0, Math.floor(cam / T)), x1 = Math.min(COLS - 1, x0 + Math.ceil(W / T) + 1);
   for (const [x, y, k] of deco) if (x >= x0 - 1 && x <= x1) drawDeco(x * T - ox, y * T, k);
@@ -917,13 +949,11 @@ function drawTiles() {
     else if (c === "=") drawPlat(px, py, x, y, r);
     else if (c === "?" || c === "S" || c === "O") {
       const shine = (Math.floor(time / 8) + x) % 7 === 0;
-      R(px, py, T, T, "#9a5a10"); R(px + 1, py + 1, T - 2, T - 2, shine ? "#ffe07a" : "#f2b632"); R(px + 1, py + 1, T - 2, 1, "#ffe9a8"); R(px + 1, py + T - 2, T - 2, 1, "#c27a10");
-      for (const [a, b] of [[2, 2], [13, 2], [2, 13], [13, 13]]) R(px + a, py + b, 1, 1, "#9a5a10");
-      R(px + 6, py + 3, 5, 2, "#6a3a00"); R(px + 9, py + 5, 2, 2, "#6a3a00"); R(px + 7, py + 7, 2, 2, "#6a3a00"); R(px + 7, py + 11, 2, 2, "#6a3a00");
+      drawQuestion(px, py, shine);
     } else if (c === "F") { // plataforma que se derrumba: rajada, y tiembla antes de caer
       const j = crumble[x + "," + y] ? Math.round(Math.sin(time * 1.7 + x) * 1.5) : 0;
       drawPlat(px + j, py, x, y, r); R(px + j + 4, py + 2, 1, 5, "#00000088"); R(px + j + 5, py + 6, 1, 4, "#00000088"); R(px + j + 11, py + 4, 1, 6, "#00000088");
-    } else if (c === "u") { R(px, py, T, T, "#4a3c30"); R(px + 1, py + 1, T - 2, T - 2, "#6b5a45"); R(px + 1, py + 1, T - 2, 1, "#8a7860"); }
+    } else if (c === "u") g.drawImage(tex("u", T, T, (x) => { rrect(x, .5, .5, T - 1, T - 1, 2.5); x.fillStyle = "#2c2218"; x.fill(); rrect(x, 1.2, 1.2, T - 2.4, T - 2.4, 2); const gr = x.createLinearGradient(0, 0, 0, T); gr.addColorStop(0, "#8a7860"); gr.addColorStop(.3, "#6b5a45"); gr.addColorStop(1, "#4a3c30"); x.fillStyle = gr; x.fill(); }), px, py, T, T);
     else if (c === "~") {
       const [l1, l2] = TH.liquid;
       if (map[y - 1]?.[x] !== "~") {
