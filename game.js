@@ -1,7 +1,7 @@
 "use strict";
 // Zombilandia: platformer de zombies en canvas, sin librerías. Personajes y arte propios (rects de píxel).
 // 5 niveles: cementerio, ciudad en ruinas, pantano tóxico, laboratorio y la guarida del Rey Zombi (jefe final).
-const VERSION = "v34"; // subir en cada publicación (también en index.html)
+const VERSION = "v35"; // subir en cada publicación (también en index.html)
 const T = 16, H = 240, ROWS = 15, COLS = 215;
 let W = 480, cache = {};
 const cv = document.getElementById("c"); let g = cv.getContext("2d"); const MAINCTX = g; let SC = 1;
@@ -1100,7 +1100,6 @@ function drawZombie(z, i) {
     g.globalAlpha = 1 - z.dead / 60; R(x - 2, y + z.h - 3, z.w + 4, 3, isBoss(z) ? "#5a1a6a" : "#3f7a2a"); R(x + 8, y + z.h - 2, 3, 1, "#ddd"); g.globalAlpha = 1; return;
   }
   const f = z.vx > 0 ? 1 : -1, s = Math.sin(z.step * 4), bob = z.ground && s > 0 ? 1 : 0;
-  g.globalAlpha = .35; R(x, y + z.h, z.w, 1, "#000"); g.globalAlpha = 1;
   if (z.flash && (z.flash >> 1) % 2) g.globalAlpha = .35;
   if (z.type === "brute") drawBrute(z, x, y + bob, f, s);
   else if (z.type === "boss") drawBoss(z, x, y + bob, f, s);
@@ -1108,8 +1107,8 @@ function drawZombie(z, i) {
   else if (z.type === "fireman") drawFireman(z, x, y + bob, z.face || f, s);
   else if (z.type === "toad") drawToad(z, x, y, f);
   else if (z.type === "doctor") drawDoctor(z, x, y + bob, z.face || f, s);
-  else if (z.type === "bat") drawBat(z, x, y, i);
-  else drawSmall(z, i, x, y + bob, f, s);
+  else if (z.type === "bat") { g.save(); g.translate(x + z.w / 2, y); batArt(g, { t: time, i }); g.restore(); }
+  else { g.save(); g.translate(x + z.w / 2, y + bob); g.scale(f, 1); zombieArt(g, { type: z.type, s, t: time, i, ground: z.ground, tt: z.t, broken: z.broken }); g.restore(); }
   g.globalAlpha = 1;
   if (z.frozen > 0) { // bloque de hielo
     const blink = z.frozen < 60 && (z.frozen >> 3) % 2;
@@ -1120,34 +1119,15 @@ function drawZombie(z, i) {
 function drawPlayer(p) {
   if (p.dead) return;
   if (p.inv > 0 && Math.floor(p.inv / 4) % 2) return;
-  const f = p.face, big = p.tier > 0, x2 = p.tier === 2, s = Math.sin(p.step * 3), air = !p.ground, run = !air && Math.abs(p.vx) > .3;
-  let x = Math.round(p.x - cam) - 1, y = Math.round(p.y);
-  if (big) { // modo bestia: el mismo sprite a 1,5x (o 2x) con músculos y aura
-    const sc = TIERS[p.tier].sc; g.save(); g.translate(Math.round(p.x - cam + (p.w - 12 * sc) / 2), y); g.scale(sc, sc); x = 0; y = 0;
-    g.globalAlpha = .16 + Math.sin(time * .25) * .07; R(-2, -3, 16, 19, x2 ? "#ff2a8a" : "#ff5a3a"); g.globalAlpha = 1;
-    if (x2) for (let k = 0; k < 3; k++) { const a = time * .15 + k * 2.1; R(6 + Math.cos(a) * 9, 7 + Math.sin(a) * 9, 1, 1, "#ffd0f0"); } // chispas alrededor
+  const f = p.face, big = p.tier > 0, x2 = p.tier === 2, sc = big ? TIERS[p.tier].sc : 1, air = !p.ground, run = !air && Math.abs(p.vx) > .3;
+  const cx = p.x - cam + p.w / 2, ty = p.y + p.h - 15.4 * sc;
+  if (big) {
+    glow(cx, p.y + p.h / 2, 20 * sc, x2 ? "#ff2a8a" : "#ff5a3a", .4 + Math.sin(time * .25) * .12);
+    if (x2) for (let k = 0; k < 3; k++) { const a = time * .15 + k * 2.1; glow(cx + Math.cos(a) * 11, p.y + p.h / 2 + Math.sin(a) * 11, 4, "#ffd0f0", .8); }
   }
-  const P = (dx, dy, w, h, c) => R(f > 0 ? x + dx : x + 12 - dx - w, y + dy, w, h, c); // dibuja espejado según hacia dónde mira
-  const ice = p.hero === 1, C = ice // paleta de cada personaje
-    ? { coat: "#3a6ab8", coatL: "#e8f0ff", coatD: "#24488a", tail: ["#e8f0ff", "#c8d8f0"], legs: "#2a2a4a", boots: "#d0e0f0", hood: "#e8f0ff", hoodL: "#ffffff", eyes: ["#9ad0ff", "#3a7aff", "#7a5aff"] }
-    : { coat: "#1f7a7a", coatL: "#2a9a9a", coatD: "#145555", tail: ["#ff8a3d", "#e2672a"], legs: "#2b2340", boots: "#5a3a2a", hood: "#1f7a7a", hoodL: "#2a9a9a", eyes: ["#7ff5ff", "#ffd84a", "#ff5ac8"] };
-  if (!air) { g.globalAlpha = .35; R(x + 1, y + 14, 10, 1, "#000"); g.globalAlpha = 1; }
-  const len = 4 + Math.min(5, Math.abs(p.vx) * 2.5) + (air ? 2 : 0); // bufanda (Chispa) o trenza (Escarcha) que flamea
-  for (let k = 0; k < len; k++) P(1 - k, (ice ? 2 + k : 6) + Math.round(Math.sin(time * .3 - k * .7) * (k / 3)) + (air ? -1 : 0), ice && k === len - 1 ? 2 : 1, 2, C.tail[k % 2]);
-  if (air) { P(3, 11, 3, 2, C.legs); P(7, 10, 3, 2, C.legs); P(3, 13, 3, 1, C.boots); P(8, 12, 3, 1, C.boots); }
-  else { const a = run && s > 0, b = run && s <= 0; P(a ? 2 : 3, 11, 3, 2, C.legs); P(b ? 8 : 7, 11, 3, 2, C.legs); P(a ? 1 : 3, 13, 4, 1, C.boots); P(b ? 8 : 7, 13, 4, 1, C.boots); }
-  P(2, 7, 8, 4, C.coat); P(2, 7, 8, 1, C.coatL); P(5, 8, 1, 3, C.coatD); P(2, 10, 8, 1, ice ? C.coatL : C.coatD);
-  const arm = run && s > 0 ? 1 : 0;
-  if (big) { P(1, 7, 10, 2, C.coat); P(4, 9, 4, 1, C.coatD); P(7, 7 + arm, 4, 3, "#f0c8a0"); P(8, 7 + arm, 2, 1, "#ffe0c8"); P(9, 9 + arm, 1, 1, "#c07a6a"); P(10, 9 + arm, 2, 2, "#e8b890"); P(0, 8, 2, 3, "#e8b890"); }
-  else { P(7, 8 + arm, 3, 2, C.coat); P(10, 8 + arm, 1, 2, "#f0c8a0"); }
-  P(2, 6, 8, 2, ice ? C.coatL : "#ff8a3d");
-  P(2, 0, 8, 6, C.hood); P(4, -1, 5, 1, C.hood); P(3, 0, 6, 1, C.hoodL); P(5, 2, 5, 4, "#f0c8a0"); P(5, 2, 5, 1, ice ? C.hood : C.coatD);
-  if (ice) { P(2, 1, 3, 5, C.hood); P(9, 1, 1, 1, "#9ad0ff"); } // pelo largo y un broche de hielo
-  const glow = p.beam > 0 ? .9 : .35 + Math.sin(time * .1) * .12;
-  g.globalAlpha = glow; P(6, 2, 6, 3, C.eyes[p.tier]); g.globalAlpha = 1;
-  P(6, 3, 1, 1, big ? "#fff6c0" : "#e8ffff"); P(8, 3, 1, 1, big ? "#fff6c0" : "#e8ffff");
-  if (x2) { P(1, 6, 10, 1, C.coat); P(7, 6, 1, 1, "#c07a6a"); } P(7, 5, 2, 1, big ? "#fff" : "#c08a70");
-  if (big) g.restore();
+  g.save(); g.translate(cx, ty); g.scale(f * sc, sc);
+  heroArt(g, { ice: p.hero === 1, tier: p.tier, run, air, s: Math.sin(p.step * 3), t: time, vx: p.vx, beam: p.beam });
+  g.restore();
 }
 function drawWater() { // el agua se dibuja encima del personaje para que se vea sumergido
   const ox = Math.floor(cam), x0 = Math.max(0, Math.floor(cam / T)), x1 = Math.min(COLS - 1, x0 + Math.ceil(W / T) + 1);
@@ -1352,7 +1332,7 @@ function postFX() {
   b1g.globalCompositeOperation = "source-over"; b1g.drawImage(cv, 0, 0, b1.width, b1.height);
   b2g.globalCompositeOperation = "source-over"; b2g.drawImage(b1, 0, 0); b2g.globalCompositeOperation = "multiply"; b2g.drawImage(b1, 0, 0); b2g.drawImage(b2, 0, 0);
   b3g.drawImage(b2, 0, 0, b3.width, b3.height);
-  g.globalCompositeOperation = "lighter"; g.globalAlpha = .65; g.drawImage(b3, 0, 0, dw, dh); g.globalAlpha = .35; g.drawImage(b2, 0, 0, dw, dh);
+  g.globalCompositeOperation = "lighter"; g.globalAlpha = .5; g.drawImage(b3, 0, 0, dw, dh); g.globalAlpha = .25; g.drawImage(b2, 0, 0, dw, dh);
   // gradación de color según el mundo
   const [col, a] = GRADE[L?.theme] || GRADE.cemetery;
   g.globalCompositeOperation = "soft-light"; g.globalAlpha = a * 2.2; g.fillStyle = col; g.fillRect(0, 0, dw, dh);
