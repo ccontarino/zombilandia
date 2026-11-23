@@ -1,7 +1,7 @@
 "use strict";
 // Zombilandia: platformer de zombies en canvas, sin librerías. Personajes y arte propios (rects de píxel).
 // 5 niveles: cementerio, ciudad en ruinas, pantano tóxico, laboratorio y la guarida del Rey Zombi (jefe final).
-const VERSION = "v41"; // subir en cada publicación (también en index.html)
+const VERSION = "v42"; // subir en cada publicación (también en index.html)
 const T = 16, H = 240, ROWS = 15, COLS = 215;
 let W = 480, cache = {};
 const cv = document.getElementById("c"); let g = cv.getContext("2d"); const MAINCTX = g; let SC = 1;
@@ -153,9 +153,32 @@ function addDeco(x0, x1, seed) {
     const q = rnd(x * 3.1 + seed * 13); if (q < .36) deco.push([x, r - 1, TH.deco[Math.floor(rnd(x + seed) * TH.deco.length)]]);
   }
 }
+// ---------- Logros y trajes ----------
+const ACH = [
+  { id: "primera", name: "Primera sangre", desc: "Derrotá a tu primer zombi" },
+  { id: "cazador", name: "Cazador", desc: "Derrotá 50 zombis (entre todas las partidas)", skin: 1 },
+  { id: "rey", name: "Cae el jefe", desc: "Derrotá a un jefe", skin: 3 },
+  { id: "perfecto", name: "Perfecto", desc: "Pasá un nivel con las 3 estrellas", skin: 2 },
+  { id: "sin_golpes", name: "Intocable", desc: "Pasá un nivel sin recibir golpes" },
+  { id: "cerebros", name: "Coleccionista", desc: "Juntá todos los cerebros de un nivel" },
+  { id: "bestia3", name: "Rabia", desc: "Llegá a bestia nivel 3" },
+  { id: "titan", name: "Titán", desc: "Llegá a bestia nivel 5", skin: 4 },
+  { id: "maraton", name: "Maratonista", desc: "Corré 500 metros en el modo infinito" },
+  { id: "amigos", name: "Mejor acompañado", desc: "Pasá un nivel jugando online" },
+];
+const SKINS = ["Clásico", "Fuego", "Neón", "Dorado", "Sombra"];
+let ach = {}, stats = { kills: 0 }, toasts = [];
+try { ach = JSON.parse(localStorage.getItem("zombilandia-logros") || "{}"); stats = Object.assign(stats, JSON.parse(localStorage.getItem("zombilandia-stats") || "{}")); } catch {}
+const skinOpen = (s) => s === 0 || !!ach[ACH.find((a) => a.skin === s)?.id];
+if (!skinOpen(CFG.skin || 0)) CFG.skin = 0;
+function unlock(id) {
+  if (ach[id] || net.role === "guest") return; ach[id] = 1; try { localStorage.setItem("zombilandia-logros", JSON.stringify(ach)); } catch {}
+  const a = ACH.find((x) => x.id === id); toasts.push({ t: 240, txt: a.name, sub: a.skin ? "¡Traje " + SKINS[a.skin] + " desbloqueado!" : a.desc }); beep(880, .1, "triangle", 1320); beep(1320, .15, "triangle", 1760, .1);
+}
+const addKill = () => { stats.kills++; unlock("primera"); if (stats.kills >= 50) unlock("cazador"); if (stats.kills % 5 === 0) try { localStorage.setItem("zombilandia-stats", JSON.stringify(stats)); } catch {} };
 function mkPlayer(i, k) {
   const keep = k?.keep || 0, x = 40 + i * 14;
-  return { x, y: 150, vx: 0, vy: 0, w: 10, h: 14, face: 1, ground: false, coyote: 0, jumps: 0, cd: 0, beam: 0, beamDir: 1, ray: null, firePrev: false, shot: 0, inv: 0, dead: 0, step: 0, springT: 0, big: false, tier: 0, want: keep, growing: keep > 0, power: keep > 0 ? 1 : 0, beamBig: false, beamTier: 0, shield: !!k?.shield, hero: i === 0 ? hero : 1 - hero, safe: { x, y: 150 } };
+  return { x, y: 150, vx: 0, vy: 0, w: 10, h: 14, face: 1, ground: false, coyote: 0, jumps: 0, cd: 0, beam: 0, beamDir: 1, ray: null, firePrev: false, shot: 0, inv: 0, dead: 0, step: 0, springT: 0, big: false, tier: 0, want: keep, growing: keep > 0, power: keep > 0 ? 1 : 0, beamBig: false, beamTier: 0, shield: !!k?.shield, hero: i === 0 ? hero : 1 - hero, skin: i === 0 ? (CFG.skin || 0) : (net.gskin || 0), safe: { x, y: 150 } };
 }
 function loadLevel(i) {
   endless = false;
@@ -215,6 +238,7 @@ try { bests = JSON.parse(localStorage.getItem("zombilandia-estrellas") || "{}");
 const clock = (f) => { const s = Math.floor(f / 60); return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`; };
 function finishLevel() {
   lastStars = [levelTime / 60 <= PAR[levelIdx], gotBrains >= totalBrains, !damaged];
+  if (lastStars.every(Boolean)) unlock("perfecto"); if (lastStars[2]) unlock("sin_golpes"); if (lastStars[1]) unlock("cerebros"); if (net.peer) unlock("amigos");
   const n = lastStars.filter(Boolean).length, b = bests[levelIdx] || { st: 0, t: Infinity };
   bests[levelIdx] = { st: Math.max(b.st, n), t: Math.min(b.t, levelTime) };
   try { localStorage.setItem("zombilandia-estrellas", JSON.stringify(bests)); } catch {}
@@ -462,14 +486,14 @@ function tryGrow() { // crece de a un nivel, solo si hay lugar (por ejemplo, no 
   const p = player;
   if (p.tier >= p.want) { p.growing = false; return; }
   if (!fits(p.tier + 1)) return;
-  setTier(p.tier + 1); burst(p.x + p.w / 2, p.y + p.h / 2, BCOL[p.tier], 16 + p.tier * 6, 4 + p.tier);
+  setTier(p.tier + 1); if (p.tier >= 3) unlock("bestia3"); if (p.tier >= 5) unlock("titan"); burst(p.x + p.w / 2, p.y + p.h / 2, BCOL[p.tier], 16 + p.tier * 6, 4 + p.tier);
   if (p.tier >= p.want) p.growing = false;
 }
 function shrink(to = 0) {
   const p = player; if (p.tier > to) setTier(to);
   Object.assign(p, { want: to, growing: false, power: to > 0 ? 1 : 0 }); beep(500, .3, "triangle", 150);
 }
-function gameOver() { if (endless && meters() > endBest) { endBest = meters(); try { localStorage.setItem("zombilandia-infinito", endBest); } catch {} } mode = "over"; for (const q of players) q.dead = 1; beep(200, .6, "sawtooth", 40); recordScore(); }
+function gameOver() { if (endless && meters() >= 500) unlock("maraton"); if (endless && meters() > endBest) { endBest = meters(); try { localStorage.setItem("zombilandia-infinito", endBest); } catch {} } mode = "over"; for (const q of players) q.dead = 1; beep(200, .6, "sawtooth", 40); recordScore(); }
 function hurt(src) {
   if (player.inv <= 0 && !player.dead) vibe(70);
   const p = player; if (p.inv > 0 || p.dead) return;
@@ -497,7 +521,7 @@ function damage(z, n) {
   }
   z.hp -= n; z.flash = 12; burst(z.x + z.w / 2, z.y + z.h / 2, "#bff8ff", 5);
   if (z.hp > 0) { beep(320, .08, "square", 160); if (isBoss(z)) shake = 4; return; }
-  z.dead = 1; score += ZT[z.type].pts; burst(z.x + z.w / 2, z.y + z.h / 2, "#7fbf5a", isBoss(z) ? 50 : 10, isBoss(z) ? 6 : 3); beep(220, .15, "square", 90);
+  z.dead = 1; addKill(); if (isBoss(z)) unlock("rey"); score += ZT[z.type].pts; burst(z.x + z.w / 2, z.y + z.h / 2, "#7fbf5a", isBoss(z) ? 50 : 10, isBoss(z) ? 6 : 3); beep(220, .15, "square", 90);
   if (isBoss(z)) { bossDead = true; shake = 40; say(`¡Derrotaste ${deA(BOSS_NAME[z.type])}!`); vibe([80, 60, 160]); fanfare(); for (const m of zombies) if (!m.dead) { m.dead = 1; burst(m.x + 6, m.y + 6, "#7fbf5a", 8); } }
 }
 // Jefes intermedios: cada uno con su forma de atacar
@@ -1145,7 +1169,7 @@ function drawPlayer(p) {
     if (x2) for (let k = 0; k < 3; k++) { const a = time * .15 + k * 2.1; glow(cx + Math.cos(a) * 11, p.y + p.h / 2 + Math.sin(a) * 11, 4, "#ffd0f0", .8); }
   }
   g.save(); g.translate(cx, ty); g.scale(f * sc, sc);
-  heroArt(g, { ice: p.hero === 1, tier: p.tier, run, air, s: Math.sin(p.step * 3), t: time, vx: p.vx, beam: p.beam });
+  heroArt(g, { skin: p.skin || 0, ice: p.hero === 1, tier: p.tier, run, air, s: Math.sin(p.step * 3), t: time, vx: p.vx, beam: p.beam });
   g.restore();
 }
 function drawWater() { // el agua se dibuja encima del personaje para que se vea sumergido
@@ -1204,6 +1228,12 @@ function hud() {
     g.textAlign = "left";
   }
   if (msgT) { g.textAlign = "center"; text(msg, W / 2, 60, "#f2c94c"); g.textAlign = "left"; }
+  if (toasts.length) {
+    const tt = toasts[0]; tt.t--; const a = Math.min(1, tt.t / 20, (240 - tt.t) / 14), y = 34 - (1 - a) * 12;
+    g.globalAlpha = a; rr(W / 2 - 110, y, 220, 30, 8, "rgba(40,28,8,.88)"); g.strokeStyle = "#f2c94c"; g.lineWidth = 1; g.beginPath(); g.roundRect ? g.roundRect(W / 2 - 109.5, y + .5, 219, 29, 8) : g.rect(W / 2 - 109.5, y + .5, 219, 29); g.stroke();
+    g.textAlign = "center"; g.textBaseline = "top"; g.font = "bold 10px ui-monospace, monospace"; text("🏆 " + tt.txt, W / 2, y + 5, "#f2c94c"); g.font = "9px ui-monospace, monospace"; text(tt.sub, W / 2, y + 18, "#cfc8e8"); g.textAlign = "left"; g.globalAlpha = 1;
+    if (tt.t <= 0) toasts.shift();
+  }
   if (banner && mode === "play") {
     const a = Math.min(1, banner / 30, (160 - banner) / 20); { const bg = g.createLinearGradient(0, 80, 0, 146); bg.addColorStop(0, "rgba(7,5,26,0)"); bg.addColorStop(.25, "rgba(7,5,26,.8)"); bg.addColorStop(.75, "rgba(7,5,26,.8)"); bg.addColorStop(1, "rgba(7,5,26,0)"); g.globalAlpha = a; g.fillStyle = bg; g.fillRect(0, 80, W, 66); } g.globalAlpha = a * .0; g.globalAlpha = a;
     g.textAlign = "center"; g.font = "10px ui-monospace, monospace"; text(endless ? `RÉCORD: ${endBest} METROS` : `NIVEL ${levelIdx + 1} DE ${LEVELS.length}`, W / 2, 95, "#cfc8e8");
@@ -1558,7 +1588,10 @@ function importProgress(s) {
 function setupCfg() {
   const box = document.getElementById("cfg"); if (!box) return;
   const sync = () => box.querySelectorAll(".seg").forEach((s) => { const k = s.dataset.k, cur = k === "mus" ? (musicOn ? "1" : "0") : String(CFG[k]); s.querySelectorAll("button").forEach((b) => b.classList.toggle("on", b.dataset.v === cur)); });
-  const open = (on) => { box.hidden = !on; if (on) { sync(); if (!net.role && mode === "play") paused = true; } else paused = false; };
+  const open = (on) => { box.hidden = !on; if (on) { sync(); buildSkin(); buildAch(); if (!net.role && mode === "play") paused = true; } else paused = false; };
+  const skRow = document.getElementById("cfgSkin"), achBox = document.getElementById("cfgAch");
+  const buildSkin = () => { if (!skRow) return; skRow.innerHTML = ""; SKINS.forEach((n, i) => { const b = document.createElement("button"); b.dataset.v = i; b.textContent = skinOpen(i) ? n : "🔒"; b.disabled = !skinOpen(i); b.title = skinOpen(i) ? n : "Se desbloquea con un logro"; b.classList.toggle("on", (CFG.skin || 0) === i); b.onclick = () => { CFG.skin = i; saveCfg(); if (players[0]) players[0].skin = i; buildSkin(); }; skRow.appendChild(b); }); };
+  const buildAch = () => { if (!achBox) return; achBox.innerHTML = ACH.map((a) => ach[a.id] ? `<div class="ok">✓ ${a.name} <small>${a.desc}${a.skin ? " · traje " + SKINS[a.skin] : ""}</small></div>` : `<div>· ${a.name} <small>${a.desc}</small></div>`).join(""); };
   document.getElementById("cfgBtn")?.addEventListener("click", () => open(box.hidden));
   document.getElementById("cfgClose").onclick = () => open(false);
   document.getElementById("cfgMenu").onclick = () => { open(false); toMenu(); };

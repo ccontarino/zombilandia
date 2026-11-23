@@ -13,7 +13,7 @@ const DEFAULT_RELAY = "wss://zombilandia.ccontarino.workers.dev"; // dirección 
   net.send = send;
 
   // ---------- Empaquetado compacto de lo que se dibuja ----------
-  const PK = ["x", "y", "vx", "vy", "face", "tier", "step", "inv", "dead", "beam", "beamDir", "beamTier", "beamBig", "shield", "hero", "power", "cd", "ground", "springT", "want"];
+  const PK = ["x", "y", "vx", "vy", "face", "tier", "step", "inv", "dead", "beam", "beamDir", "beamTier", "beamBig", "shield", "hero", "power", "cd", "ground", "springT", "want", "skin"];
   const ZK = ["uid", "idx", "type", "x", "y", "vx", "step", "dead", "flash", "frozen", "face", "hp", "glass", "ground", "broken", "off", "t"];
   const val = (v) => (typeof v === "boolean" ? +v : typeof v === "number" ? r1(v) : v ?? 0);
   const packP = (p) => { const a = PK.map((k) => val(p[k])); a.push(p.ray ? [Math.round(p.ray.x), Math.round(p.ray.y), Math.round(p.ray.w), p.ray.h] : 0); return a; };
@@ -98,7 +98,7 @@ const DEFAULT_RELAY = "wss://zombilandia.ccontarino.workers.dev"; // dirección 
     switch (m.t) {
       case "join": peerJoin(); break;
       case "left": if (m.who === "guest") peerGone("El invitado se desconectó"); break;
-      case "hi": lvlDirty = true; break;
+      case "hi": lvlDirty = true; net.gskin = m.skin | 0; if (players[1]) players[1].skin = net.gskin; break;
       case "i":
         keys2.left = !!m.l; keys2.right = !!m.r; keys2.jump = !!m.j; keys2.fire = !!m.f; if (m.tj) tap2.jump = true; if (m.tf) tap2.fire = true; break;
       case "p": if (net.peer && !net.paused) press(m.k); break;
@@ -204,7 +204,7 @@ const DEFAULT_RELAY = "wss://zombilandia.ccontarino.workers.dev"; // dirección 
     ws = sock;
     sock.onopen = () => {
       opened = true; retry = 0; lastRx = performance.now(); note = ""; lock();
-      if (role === "guest") { net.peer = true; nPlayers = 2; if (!gotSnap) { mode = "title"; loadLevel(0); } send({ t: "hi" }); setMsg(`Conectado a la sala ${c}. Esperando al anfitrión…`); showOn(false); }
+      if (role === "guest") { net.peer = true; nPlayers = 2; if (!gotSnap) { mode = "title"; loadLevel(0); } send({ t: "hi", skin: CFG.skin || 0 }); setMsg(`Conectado a la sala ${c}. Esperando al anfitrión…`); showOn(false); }
       else { $("onMenu").hidden = true; $("onSala").hidden = false; $("onCode").textContent = c; $("onLink").value = shareLink(c); setMsg("Mandale el link a tu amigo y esperá a que entre."); }
     };
     sock.onmessage = (e) => { lastRx = performance.now(); let m; try { m = JSON.parse(e.data); } catch { return; } if (role === "host") hostMsg(m); else guestMsg(m); };

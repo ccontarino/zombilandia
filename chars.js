@@ -10,6 +10,8 @@ function heroArt(g, o) {
   const C = ice
     ? { coat: "#3a6ab8", coatL: "#8fb4f0", coatD: "#24488a", tail: ["#f4f8ff", "#b8cce8"], legs: "#2a2a4a", legsL: "#44446e", boots: "#d0e0f0", hood: "#dfe9fb", hoodL: "#ffffff", hoodD: "#9fb4d8", eyes: ["#9ad0ff", "#6ab0ff", "#3a7aff", "#5a6aff", "#7a5aff", "#c07aff"], belt: "#6a8ad8", hair: "#f4f8ff", skin: "#d4aa92", rage: "#4a78c8" }
     : { coat: "#1f7a7a", coatL: "#35b0aa", coatD: "#115050", tail: ["#ffa04a", "#e2572a"], legs: "#2b2340", legsL: "#463a66", boots: "#6a4630", hood: "#1a7470", hoodL: "#2f9e98", hoodD: "#0e4a48", eyes: ["#7ff5ff", "#a8f070", "#ffd84a", "#ff9a3a", "#ff4a4a", "#ff5ac8"], belt: "#ff8a3d", hair: "#2a1a14", skin: "#e0aa84", rage: "#e0562a" };
+  const SK = [null, { c: "#c0392b", cl: "#ef6a4a", cd: "#7a1a12", tail: ["#ffd060", "#ff7a1a"] }, { c: "#8a20d8", cl: "#c060ff", cd: "#4a0e80", tail: ["#5af0ff", "#ff5ac8"] }, { c: "#c9a227", cl: "#f4d860", cd: "#7a5a10", tail: ["#fff0a0", "#e8b830"] }, { c: "#2c2c3c", cl: "#5a5a78", cd: "#14141e", tail: ["#9a9ac0", "#4a4a68"] }][o.skin | 0];
+  if (SK) { C.coat = lerpHex(C.coat, SK.c, .85); C.coatL = lerpHex(C.coatL, SK.cl, .85); C.coatD = lerpHex(C.coatD, SK.cd, .85); C.hood = lerpHex(C.hood, SK.c, .8); C.hoodL = lerpHex(C.hoodL, SK.cl, .8); C.hoodD = lerpHex(C.hoodD, SK.cd, .8); C.tail = SK.tail; }
   const skT = lerpHex(C.skin, C.rage, Math.min(1, mf * 1.15)), skB = lerpHex(skT, "#000000", .3), skL = lerpHex(skT, "#ffffff", .22);
   g.lineCap = "round"; g.lineJoin = "round";
   const len = 4 + Math.min(5, Math.abs(o.vx) * 2.5) + (air ? 2 : 0);
