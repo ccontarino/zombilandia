@@ -1,7 +1,7 @@
 "use strict";
 // Zombilandia: platformer de zombies en canvas, sin librerías. Personajes y arte propios (rects de píxel).
 // 5 niveles: cementerio, ciudad en ruinas, pantano tóxico, laboratorio y la guarida del Rey Zombi (jefe final).
-const VERSION = "v56"; // subir en cada publicación (también en index.html)
+const VERSION = "v57"; // subir en cada publicación (también en index.html)
 // ---------- Métricas de uso (Umami, anónimas, sin cookies) ----------
 // Pegá acá el "Website ID" de tu sitio en Umami; vacío = no se manda nada. Respeta "No rastrear" del navegador y solo cuenta en el sitio publicado.
 const UMAMI = { id: "4c40559c-a7e6-4a1f-8fb1-6d289f3ffbcb", src: "https://cloud.umami.is/script.js", domains: "ccontarino.github.io" };
@@ -1429,7 +1429,9 @@ function drawTitle() {
   g.font = "11px ui-monospace, monospace"; g.fillStyle = "#cfc8e8"; g.fillText("Saltá, disparale y llegá a la bandera.", W / 2, 70);
   titleBoxes().forEach((b, i) => {
     const open = titleOpen(i), on = i === sel, best = bests[i];
-    rr(b.x, b.y, b.w, b.h, 5, on ? "#3b2f60" : "#1d1730"); g.strokeStyle = on ? "#f2c94c" : open ? "#4a3e6b" : "#2a2240"; g.lineWidth = on ? 2 : 1; g.beginPath(); g.roundRect ? g.roundRect(b.x + .5, b.y + .5, b.w - 1, b.h - 1, 5) : g.rect(b.x + .5, b.y + .5, b.w - 1, b.h - 1); g.stroke(); if (on) glow(b.x + b.w / 2, b.y + b.h / 2, 34, "#f2c94c", .35);
+    { const th = LEVELS[i] && THEMES[LEVELS[i].theme], gr = th ? g.createLinearGradient(0, b.y, 0, b.y + b.h) : null;
+      if (gr) { gr.addColorStop(0, th.sky[1]); gr.addColorStop(1, th.sky[3]); }
+      rr(b.x, b.y, b.w, b.h, 5, "#1d1730"); if (gr) { g.globalAlpha = open ? (on ? .95 : .7) : .25; g.fillStyle = gr; g.beginPath(); g.roundRect ? g.roundRect(b.x, b.y, b.w, b.h, 5) : g.rect(b.x, b.y, b.w, b.h); g.fill(); g.globalAlpha = 1; } else if (on) rr(b.x, b.y, b.w, b.h, 5, "#3b2f60"); } g.strokeStyle = on ? "#f2c94c" : open ? "#4a3e6b" : "#2a2240"; g.lineWidth = on ? 2 : 1; g.beginPath(); g.roundRect ? g.roundRect(b.x + .5, b.y + .5, b.w - 1, b.h - 1, 5) : g.rect(b.x + .5, b.y + .5, b.w - 1, b.h - 1); g.stroke(); if (on) glow(b.x + b.w / 2, b.y + b.h / 2, 34, "#f2c94c", .35);
     g.font = "bold 16px ui-monospace, monospace"; g.fillStyle = open ? (LEVELS[i] && LEVELS[i].boss ? "#ff6a4a" : i > 4 && i < NL ? "#ffb03a" : "#f3efe6") : "#4a3e6b"; g.fillText(i === NL ? "∞" : open ? String(i + 1) : "×", b.x + b.w / 2, b.y + 14);
     if (open && i < NL) for (let k = 0; k < 3; k++) star(b.x + 6 + k * 10, b.y + 19, best && best.st > k);
     if (i === NL) { g.font = "9px ui-monospace, monospace"; g.fillStyle = "#7cc456"; g.fillText(endBest ? `${endBest}m` : "nuevo", b.x + b.w / 2, b.y + 25); }
