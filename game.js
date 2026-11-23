@@ -1,7 +1,7 @@
 "use strict";
 // Zombilandia: platformer de zombies en canvas, sin librerías. Personajes y arte propios (rects de píxel).
 // 5 niveles: cementerio, ciudad en ruinas, pantano tóxico, laboratorio y la guarida del Rey Zombi (jefe final).
-const VERSION = "v13"; // subir en cada publicación (también en index.html)
+const VERSION = "v14"; // subir en cada publicación (también en index.html)
 const T = 16, H = 240, ROWS = 15, COLS = 190;
 let W = 480, cache = {};
 const cv = document.getElementById("c"), g = cv.getContext("2d");
@@ -310,7 +310,14 @@ function fits(n) {
   for (let ty = Math.floor(ny / T); ty <= Math.floor((ny + b.h - .01) / T); ty++) for (let tx = Math.floor(nx / T); tx <= Math.floor((nx + b.w - .01) / T); tx++) if (solid(tx, ty)) return false;
   return true;
 }
+// ---------- Vibración ----------
+// Solo donde el navegador la permite (Android). Safari en iPhone no la soporta.
+const canVibe = typeof navigator !== "undefined" && "vibrate" in navigator;
+let vibeOn = true; try { vibeOn = localStorage.getItem("zombilandia-vibra") !== "0"; } catch {}
+const vibe = (p) => { if (vibeOn && canVibe) try { navigator.vibrate(p); } catch {} };
+function toggleVibe() { vibeOn = !vibeOn; try { localStorage.setItem("zombilandia-vibra", vibeOn ? "1" : "0"); } catch {} const b = document.getElementById("vib"); if (b) b.style.opacity = vibeOn ? 1 : .4; vibe(40); }
 function powerUp() {
+  vibe([30, 40, 60]);
   const p = player; p.want = Math.min(2, Math.max(p.tier, p.want) + 1); p.growing = true; p.power = 1;
   say(p.want === 2 ? "¡MODO BESTIA x2!" : "¡MODO BESTIA!"); shake = p.want === 2 ? 12 : 6;
   [196, 262, 330, 392, 523, 659].forEach((f, i) => beep(f / (p.want === 2 ? 2 : 1), .12, "square", 0, i * .06)); if (p.want === 2) beep(55, .8, "sawtooth", 110);
@@ -328,6 +335,7 @@ function shrink(to = 0) {
 }
 function gameOver() { mode = "over"; player.dead = 1; beep(200, .6, "sawtooth", 40); recordScore(); }
 function hurt(src) {
+  if (player.inv <= 0 && !player.dead) vibe(70);
   const p = player; if (p.inv > 0 || p.dead) return;
   damaged = true;
   const lvl = Math.max(p.tier, p.want);
@@ -337,7 +345,7 @@ function hurt(src) {
   p.inv = 100; p.vy = -4.5; p.vx = src ? (Math.sign(p.x + p.w / 2 - src.x - src.w / 2) || -p.face) * (src.type === "boss" ? 4 : 2.5) : -p.face * 2;
 }
 function loseLife(col = "#fff") {
-  const p = player; damaged = true; shrink(); lives--; shake = 10; beep(150, .4, "sawtooth", 50); burst(p.x + 5, p.y + 8, col, 14);
+  const p = player; vibe([60, 40, 140]); damaged = true; shrink(); lives--; shake = 10; beep(150, .4, "sawtooth", 50); burst(p.x + 5, p.y + 8, col, 14);
   if (lives <= 0) return gameOver();
   Object.assign(p, { x: p.safe.x, y: p.safe.y - 2, vx: 0, vy: 0, inv: 90 });
 }
@@ -367,7 +375,7 @@ function updateZombie(z, p) {
     if (z.x === before && z.vx || !solid(ahead, under)) { z.vx = -z.vx; z.x = before; }
   } else if (z.x === before && z.vx) z.vx = -z.vx;
   const vyb = z.vy; collideY(z); z.step += .08 * Math.abs(z.vx) / .4;
-  if (boss && z.ground && !z.wasG && vyb > 3) { shake = 12; burst(z.x + 14, z.y + 36, "#8a6a60", 12); beep(70, .3, "sawtooth", 40); }
+  if (boss && z.ground && !z.wasG && vyb > 3) { shake = 12; vibe(90); burst(z.x + 14, z.y + 36, "#8a6a60", 12); beep(70, .3, "sawtooth", 40); }
   z.wasG = z.ground;
   if (z.y > ROWS * T + 30 || touching(z, "~", 4)) { z.dead = 1; burst(z.x + 6, z.y + 6, TH.liquid?.[0] || "#7fbf5a", 6); return; }
   if (!p.dead && hit(p, z)) {
@@ -403,7 +411,7 @@ function update() {
   // rayo láser de ojos: se dispara al apretar, con recarga
   if (p.cd > 0) p.cd--;
   if ((tap.fire || keys.fire && !p.firePrev) && p.cd <= 0) {
-    const t = p.tier; p.beamTier = t; p.beamBig = t > 0; p.beam = TIER.beam[t]; p.cd = TIER.cd[t]; p.beamDir = p.face; p.shot++; shake = [3, 7, 11][t];
+    const t = p.tier; p.beamTier = t; p.beamBig = t > 0; p.beam = TIER.beam[t]; p.cd = TIER.cd[t]; p.beamDir = p.face; p.shot++; shake = [3, 7, 11][t]; if (t) vibe(30 * t);
     beep([140, 90, 60][t], [.25, .4, .5][t], "sawtooth", [900, 600, 400][t]); if (t) beep(60 / t, .4, "square", 30);
   }
   p.firePrev = keys.fire; tap.fire = false;
@@ -915,6 +923,7 @@ cv.addEventListener("pointerdown", (e) => {
   }
   press(null);
 });
+const vibBtn = document.getElementById("vib"); if (vibBtn) { if (!canVibe) vibBtn.remove(); else { vibBtn.style.opacity = vibeOn ? 1 : .4; vibBtn.addEventListener("click", toggleVibe); } }
 const musBtn = document.getElementById("mus"); if (musBtn) { musBtn.textContent = musicOn ? "♪" : "✕"; musBtn.addEventListener("click", toggleMusic); }
 document.querySelectorAll("#pad button").forEach((b) => {
   const k = b.dataset.k;
