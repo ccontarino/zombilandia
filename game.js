@@ -1,7 +1,7 @@
 "use strict";
 // Zombilandia: platformer de zombies en canvas, sin librerías. Personajes y arte propios (rects de píxel).
 // 5 niveles: cementerio, ciudad en ruinas, pantano tóxico, laboratorio y la guarida del Rey Zombi (jefe final).
-const VERSION = "v30"; // subir en cada publicación (también en index.html)
+const VERSION = "v31"; // subir en cada publicación (también en index.html)
 const T = 16, H = 240, ROWS = 15, COLS = 215;
 let W = 480, cache = {};
 const cv = document.getElementById("c"), g = cv.getContext("2d");

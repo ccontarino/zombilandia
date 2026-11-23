@@ -24,10 +24,13 @@ const DEFAULT_RELAY = "wss://zombilandia.ccontarino.workers.dev"; // dirección 
     PK.forEach((k, i) => { if (k !== "x" && k !== "y" && !(pred && OWN.has(k))) q[k] = a[i]; });
     q.tx = a[0]; q.ty = a[1]; q.pred = !!pred;
     if (pred) { // reconciliación: comparo con dónde estaría el servidor ahora (un viaje de ida y vuelta después)
-      const d = Math.max(2, Math.min(20, rtt / 16.7)), svx = a[2], svy = a[3], gr = a[PK.indexOf("ground")];
+      const d = Math.max(2, Math.min(14, rtt / 16.7)), svx = a[2], svy = a[3], gr = a[PK.indexOf("ground")];
       const ex = a[0] + svx * d, ey = a[1] + (gr ? 0 : svy * d + .14 * d * d);
-      if (Math.abs(ex - q.x) > 48 || Math.abs(ey - q.y) > 48) { q.x = a[0]; q.y = a[1]; q.vx = svx; q.vy = svy; }
-      else { q.x += (ex - q.x) * .2; q.y += (ey - q.y) * .2; }
+      if (Math.abs(ex - q.x) > 48 || Math.abs(ey - q.y) > 48) { q.x = a[0]; q.y = a[1]; q.vx = svx; q.vy = svy; q.cx = q.cy = 0; }
+      else { // corrección suave: zona muerta (el wifi hace temblar el cálculo) y se aplica de a poco en los ticks siguientes
+        const ax = ex - q.x, ay = ey - q.y;
+        q.cx = Math.abs(ax) < 5 ? 0 : (ax - Math.sign(ax) * 5) * .5; q.cy = Math.abs(ay) < 10 ? 0 : (ay - Math.sign(ay) * 10) * .5;
+      }
     } else {
       if (q.x === undefined || Math.abs(q.x - q.tx) > 48 || Math.abs(q.y - q.ty) > 48) { q.x = q.tx; q.y = q.ty; }
       if (own && mode === "play" && !a[PK.indexOf("dead")]) q.synced = true;
@@ -141,7 +144,7 @@ const DEFAULT_RELAY = "wss://zombilandia.ccontarino.workers.dev"; // dirección 
   function guestMsg(m) {
     if (m.t === "lvl") applyLvl(m);
     else if (m.t === "s") applySnap(m);
-    else if (m.t === "pong") rtt = Math.round(performance.now() - m.ts);
+    else if (m.t === "pong") { const v = performance.now() - m.ts; rtt = Math.round(rtt ? rtt * .7 + v * .3 : v); }
     else if (m.t === "left" && m.who === "host") note = "El anfitrión se desconectó. Esperando que vuelva…";
   }
   function guestStep() {
@@ -149,7 +152,7 @@ const DEFAULT_RELAY = "wss://zombilandia.ccontarino.workers.dev"; // dirección 
     const k = keys, sig = (k.left ? 1 : 0) + (k.right ? 2 : 0) + (k.jump ? 4 : 0) + (k.fire ? 8 : 0), tj = tap.jump, tf = tap.fire; tap.jump = tap.fire = false;
     if (mode === "play" && (sig !== lastSig || tj || tf || tickN % 30 === 0)) { send({ t: "i", l: +k.left, r: +k.right, j: +k.jump, f: +k.fire, tj: +tj, tf: +tf }); lastSig = sig; }
     else if (mode !== "play" && tickN % 30 === 0) send({ t: "i", l: 0, r: 0, j: 0, f: 0 }); // señal de vida
-    if (tickN % 60 === 0) send({ t: "ping", ts: performance.now() });
+    if (tickN % 30 === 0) send({ t: "ping", ts: performance.now() });
     if (mode === "play") { // extrapolación: avanzo el destino con la velocidad conocida para que no se vea atrasado entre paquetes
       for (const q of players) if (q.tx !== undefined && !q.pred && !q.dead) { q.tx += q.vx; if (!q.ground) { q.vy = Math.min(q.vy + .28, 6.5); q.ty += q.vy; } }
       for (const z of zombies) if (z.tx !== undefined && !z.dead && !z.frozen) z.tx += z.vx;
@@ -161,6 +164,7 @@ const DEFAULT_RELAY = "wss://zombilandia.ccontarino.workers.dev"; // dirección 
     const me1 = players[1];
     if (me1 && me1.pred && mode === "play") { // predicción: muevo mi personaje ya, sin esperar al anfitrión
       pi = 1; player = me1; K = keys; TP = { jump: tj, fire: false }; net.quiet = true;
+      if (me1.cx) { const c = me1.cx * .12; me1.x += c; me1.cx -= c; } if (me1.cy) { const c = me1.cy * .12; me1.y += c; me1.cy -= c; }
       try { movePlayer(me1); } finally { net.quiet = false; K = keys; TP = tap; }
       if (me1.ground && Math.abs(me1.vx) > .3) me1.step += Math.abs(me1.vx) * .12;
       if (keys.left) me1.face = -1; else if (keys.right) me1.face = 1;
