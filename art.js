@@ -182,6 +182,28 @@ function decoArt(x, k, T, theme) {
     sh(8, 4.4); x.beginPath(); x.ellipse(8, 11.4, 3.6, 3.2, 0, 0, 7); fs(vg(8, 15, "#f6f0e2", "#b8b0a0")); x.beginPath(); rr2x(x, 5.8, 13.6, 4.4, 2.2, .8); fs("#e8e0d0", .4); x.fillStyle = "#1a1418"; x.beginPath(); x.ellipse(6.6, 11.4, .9, 1.1, 0, 0, 7); x.ellipse(9.4, 11.4, .9, 1.1, 0, 0, 7); x.moveTo(8, 12.8); x.lineTo(7.4, 13.8); x.lineTo(8.6, 13.8); x.fill();
   } else if (k === "torch") {
     x.beginPath(); rr2x(x, 7, 6.6, 2, 9.4, .8); fs(vg(6, 16, "#7a5a3a", "#3a2614"), .4); x.beginPath(); rr2x(x, 5.6, 5.4, 4.8, 2, .9); fs("#6a6a74", .4);
+  } else if (k === "pine") {
+    sh(8, 5); x.beginPath(); x.rect(7, 12, 2, 4); fs("#5a3a22", .4);
+    for (const [y0, w] of [[8, 6], [4.6, 5], [1.4, 3.6]]) { x.beginPath(); x.moveTo(8, y0 - 1.6); x.lineTo(8 + w, y0 + 5); x.lineTo(8 - w, y0 + 5); x.closePath(); fs(vg(y0 - 2, y0 + 5, "#3a8a6a", "#1a4a3a")); x.fillStyle = "#f4faff"; x.beginPath(); x.moveTo(8, y0 - 1.6); x.lineTo(8 + w * .55, y0 + 1.6); x.lineTo(8 - w * .55, y0 + 1.6); x.closePath(); x.fill(); }
+  } else if (k === "snowman") {
+    sh(8, 5); x.beginPath(); x.arc(8, 12, 3.8, 0, 7); fs(vg(8, 16, "#ffffff", "#b8cce4")); x.beginPath(); x.arc(8, 6.8, 2.8, 0, 7); fs(vg(4, 10, "#ffffff", "#c8d8ee"));
+    x.fillStyle = "#1a1a2a"; x.beginPath(); x.arc(7, 6.2, .5, 0, 7); x.arc(9, 6.2, .5, 0, 7); x.fill(); x.fillStyle = "#ff8a2a"; x.beginPath(); x.moveTo(8, 7); x.lineTo(11, 7.6); x.lineTo(8, 8); x.fill(); x.fillStyle = "#c0302a"; x.fillRect(5.4, 8.6, 5.2, 1.2); x.fillStyle = "#1a1a2a"; x.fillRect(6, 3.2, 4, 1.4); x.fillRect(6.8, 1.6, 2.4, 1.8);
+  } else if (k === "cactus") {
+    sh(8, 5); x.beginPath(); rr2x(x, 6.2, 3, 3.6, 13, 1.8); fs(vg(3, 16, "#5ab060", "#2a6a34")); x.beginPath(); rr2x(x, 2.4, 7, 2.2, 5, 1.1); fs("#4a9a50", .4); x.beginPath(); rr2x(x, 2.4, 10.4, 4.6, 2, 1); fs("#4a9a50", .4); x.beginPath(); rr2x(x, 11.4, 5, 2.2, 5, 1.1); fs("#4a9a50", .4); x.beginPath(); rr2x(x, 9, 8.6, 4.6, 2, 1); fs("#4a9a50", .4);
+    x.fillStyle = "#ff7ab0"; x.beginPath(); x.arc(8, 3, 1.1, 0, 7); x.fill();
+  } else if (k === "fern") {
+    sh(8, 6); for (const [lean, h, c] of [[-5, 11, "#2a8a3a"], [5, 10, "#3aa84a"], [-2, 13, "#4ac060"], [2, 9, "#2a8a3a"]]) { x.strokeStyle = c; x.lineWidth = 1.2; x.beginPath(); x.moveTo(8, 16); x.quadraticCurveTo(8 + lean * .3, 16 - h * .7, 8 + lean, 16 - h); x.stroke(); }
+  } else if (k === "flower") {
+    sh(8, 4); x.strokeStyle = "#2a8a3a"; x.lineWidth = 1; x.beginPath(); x.moveTo(8, 16); x.quadraticCurveTo(9, 11, 8, 7); x.stroke(); x.beginPath(); x.ellipse(5.6, 12.4, 2.4, 1, -.5, 0, 7); x.fillStyle = "#3aa84a"; x.fill();
+    for (let i = 0; i < 6; i++) { const a = i * 1.047; x.beginPath(); x.ellipse(8 + Math.cos(a) * 2.6, 5.4 + Math.sin(a) * 2.6, 2, 1.4, a, 0, 7); fs("#ff7ac0", .3); } x.fillStyle = "#ffe060"; x.beginPath(); x.arc(8, 5.4, 1.5, 0, 7); x.fill();
+  } else if (k === "balloon") {
+    sh(8, 3); x.strokeStyle = "rgba(255,255,255,.6)"; x.lineWidth = .5; x.beginPath(); x.moveTo(8, 10.4); x.quadraticCurveTo(6, 13, 8, 16); x.stroke(); x.beginPath(); x.ellipse(8, 6, 4.2, 5, 0, 0, 7); fs(vg(1, 11, "#ff7a9a", "#c02a5a")); x.beginPath(); x.moveTo(7.2, 11); x.lineTo(8.8, 11); x.lineTo(8, 10.2); x.fill(); x.fillStyle = "rgba(255,255,255,.5)"; x.beginPath(); x.ellipse(6.4, 4, 1, 1.8, -.4, 0, 7); x.fill();
+  } else if (k === "lamp") {
+    sh(8, 3); x.beginPath(); rr2x(x, 7.2, 4, 1.6, 12, .6); fs("#3a2a4a", .4); x.beginPath(); rr2x(x, 5, 1.6, 6, 3.4, 1.4); fs(vg(1, 5, "#fff0a0", "#ffb030"), .4);
+  } else if (k === "antenna") {
+    sh(8, 4); x.beginPath(); x.rect(7.4, 5, 1.2, 11); fs("#9aa4bc", .3); x.beginPath(); x.ellipse(8, 5.4, 4.6, 1.8, -.3, 0, 7); fs(vg(3, 8, "#e8eef8", "#8a96b0")); x.fillStyle = "#ff4a4a"; x.beginPath(); x.arc(8, 3.4, .9, 0, 7); x.fill();
+  } else if (k === "rock") {
+    sh(8, 6); x.beginPath(); x.moveTo(2.6, 15.6); x.quadraticCurveTo(2.2, 9, 6.4, 8); x.quadraticCurveTo(9, 6.6, 11, 9); x.quadraticCurveTo(14, 10.6, 13.6, 15.6); x.closePath(); fs(vg(7, 16, "#9aa0b0", "#4a4e60")); x.fillStyle = "rgba(255,255,255,.3)"; x.beginPath(); x.ellipse(6.4, 10, 1.6, .8, -.4, 0, 7); x.fill();
   } else { // pasto suelto
     for (let i = 0; i < 7; i++) { const a = 3.4 + i * 1.5, h = 4 + (i * 37 % 5), lean = ((i * 53 % 7) - 3) * .5; x.fillStyle = i % 2 ? "#4f8a35" : "#3f6a2a"; x.beginPath(); x.moveTo(a - .8, 16); x.quadraticCurveTo(a + lean * .3, 16 - h * .6, a + lean, 16 - h); x.quadraticCurveTo(a + lean * .5 + .2, 16 - h * .5, a + .8, 16); x.fill(); }
   }

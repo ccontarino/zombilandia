@@ -1,7 +1,7 @@
 "use strict";
 // Zombilandia: platformer de zombies en canvas, sin librerías. Personajes y arte propios (rects de píxel).
 // 5 niveles: cementerio, ciudad en ruinas, pantano tóxico, laboratorio y la guarida del Rey Zombi (jefe final).
-const VERSION = "v48"; // subir en cada publicación (también en index.html)
+const VERSION = "v49"; // subir en cada publicación (también en index.html)
 const T = 16, H = 240, ROWS = 15, COLS = 215;
 let W = 480, cache = {};
 const cv = document.getElementById("c"); let g = cv.getContext("2d"); const MAINCTX = g; let SC = 1;
@@ -36,6 +36,16 @@ const THEMES = {
     grass: ["#9aaabb", "#5a6676", "#2e3644"], dirt: ["#3a4454", "#2e3644", "#222a36", "#4a5666"], plat: ["#6a7686", "#9aaabb", "#3a4454"], deco: ["crate", "barrel", "tank", "crate"], liquid: ["#c6ff3a", "#5a9a10"] },
   lair: { sky: ["#0a0204", "#2a0608", "#6a1410", "#a02a10"], stars: 0, moon: "#ff6a3a", cloud: "#3a0a0a", hill: "#1a0606", mid: "castle", near: "fence", fog: "#ff5a28", ambient: "embers",
     grass: ["#8a6a70", "#5a4a52", "#3a2e34"], dirt: ["#4a3a42", "#3a2e34", "#2a2026", "#5a4a52"], plat: ["#5a4a52", "#7a6a70", "#2a2026"], deco: ["skull", "torch", "bones", "skull", "torch"], liquid: ["#ffcc33", "#ff5a10"] },
+  snow: { sky: ["#0a1230", "#1c2c58", "#44629a", "#9ab8d8"], stars: 1, moon: "#e8f4ff", cloud: "#5a6c98", hill: "#34466e", mid: "peaks", near: "pines", fog: "#c8e0ff", ambient: "snow",
+    grass: ["#f4faff", "#c8dcf0", "#8aa6c8"], dirt: ["#4a5a7a", "#3a4866", "#2a3450", "#62749a"], plat: ["#7ac8f0", "#c8f0ff", "#2a6a9a"], deco: ["pine", "snowman", "pine", "rock", "pine"], liquid: ["#9ae8ff", "#2a6aa0"] },
+  desert: { sky: ["#2a1030", "#7a2a48", "#d0603a", "#ffb050"], stars: 0, moon: "#fff0b0", cloud: "#a04a48", hill: "#7a3040", mid: "dunes", near: "cacti", fog: "#ffc880", ambient: "sand",
+    grass: ["#f0d890", "#d0a860", "#9a7038"], dirt: ["#b07a48", "#8a5a34", "#6a4026", "#c89058"], plat: ["#c08a50", "#e8b070", "#6a4020"], deco: ["cactus", "bones", "skull", "cactus", "rock"], liquid: ["#e8b860", "#8a5018"] },
+  jungle: { sky: ["#021410", "#073a2a", "#146a40", "#3a9a4a"], stars: 0, moon: "#d0ffa0", cloud: "#0a3a28", hill: "#06281c", mid: "jungle", near: "ferns", fog: "#60d890", ambient: "spores",
+    grass: ["#5adc50", "#2a9a3a", "#146a28"], dirt: ["#3a2a1a", "#2e2014", "#22160c", "#4e3a24"], plat: ["#7a5a32", "#a07a46", "#3a2410"], deco: ["fern", "flower", "fern", "mushroom", "weed"], liquid: ["#d070ff", "#6a2aa8"] },
+  carnival: { sky: ["#14062a", "#3a0c58", "#8a1c78", "#e05a90"], stars: 1, moon: "#ffe8f8", cloud: "#6a2a7a", hill: "#2a0a40", mid: "ferris", near: "lights", fog: "#ff8ad8", ambient: "confetti",
+    grass: ["#ff8ac8", "#d04a98", "#8a2468"], dirt: ["#5a2a6a", "#46205a", "#321442", "#703a82"], plat: ["#ffcc33", "#ff8a3a", "#a02a40"], deco: ["balloon", "lamp", "balloon", "lamp"], liquid: ["#ff7ad8", "#a02a98"] },
+  moon: { sky: ["#000008", "#04041a", "#0a0a30", "#16183e"], stars: 1, moon: "#6ab4ff", cloud: "#10122c", hill: "#181a36", mid: "lunar", near: "rocks", fog: "#7a86c8", ambient: "stardust",
+    grass: ["#c8ccd8", "#9094a8", "#5a5e74"], dirt: ["#5a5e72", "#484c60", "#34384a", "#70748a"], plat: ["#8a96b0", "#bcc8e0", "#3a4458"], deco: ["antenna", "rock", "rock", "crate", "antenna"], liquid: ["#9aff4a", "#3a9a1a"] },
 };
 
 const LEVELS = [
@@ -107,61 +117,52 @@ let players = [], pi = 0, K = keys, TP = tap, nPlayers = 1;
 const net = { role: null, peer: false, paused: false, rec: null, quiet: false, step() {}, press() { return false; } }; // lo completa net.js
 const me = () => (net.role === "guest" ? 1 : 0);
 const ctx = (i) => { pi = i; player = players[i]; K = inputs[i]; TP = taps[i]; }; // "player" es el jugador que se está procesando
-// Niveles 6-10: mapas propios, más difíciles (más zombis, jefes distintos, zombis un poco más veloces)
+// Niveles 6-10: escenarios nuevos (nieve, desierto, selva, parque de diversiones y luna), cada uno con su propio terreno y mecánica
+const land = (segs) => { for (const [a, b, t] of segs) fill(a, b, t, 14, "#"); }; // tramos de suelo [desde, hasta, fila de la superficie]
+const gaps = (segs, ch = "~") => { for (let k = 0; k < segs.length - 1; k++) { const a = segs[k][1] + 1, b = segs[k + 1][0] - 1; if (b >= a) fill(a, b, 13, 14, ch); } };
 LEVELS.push(
-  { name: "Cementerio maldito", theme: "cemetery", hard: true, build() {
+  { name: "Montaña nevada", theme: "snow", hard: true, build() { // sube y baja por la montaña; el hielo patina
+    const T = [[0, 14, 13], [15, 22, 12], [23, 29, 11], [30, 36, 10], [37, 43, 9], [44, 51, 8], [56, 62, 9], [63, 68, 10], [69, 74, 11], [75, 79, 12], [84, 92, 12], [93, 97, 11], [98, 102, 10], [103, 108, 9], [109, 114, 8], [119, 125, 9], [126, 131, 10], [132, 137, 11], [138, 143, 12], [148, 156, 12], [157, 160, 11], [161, 164, 10], [165, 168, 11], [169, 172, 12], [173, 214, 13]];
+    land(T); gaps(T);
+    plat(45, 5, 3, "?"); coins(45, 4, 3); plat(100, 7, 3, "?"); plat(150, 9, 3, "?"); plat(33, 7, 3); coins(33, 6, 3); plat(58, 6, 3); coins(58, 5, 3); plat(111, 5, 3); coins(111, 4, 3); plat(128, 7, 3); coins(128, 6, 3);
+    set(46, 5, "S"); set(101, 7, "O"); set(151, 9, "S"); set(66, 9, "x"); set(135, 10, "x"); set(160, 10, "x");
+    return { arena: { wall: 188, lock: 192 }, movers: [], goal: 211, spawns: S("205G 8w 12r 18w 26j 33w 40r 47w 49k 58j 61w 66r 72w 77r 86w 90r 95k 100j 106w 111r 122j 128w 134r 140k 150w 154r 159w 163j 167r 176w 180r 20v 55v 105v 140v 70s 124s 38e 100e") };
+  } },
+  { name: "Desierto de huesos", theme: "desert", hard: true, build() { // dunas, arenas movedizas y dos pirámides escalonadas
     fill(0, COLS - 1, 13, 14, "#");
-    for (const [a, b] of [[22, 25], [48, 51], [76, 79], [104, 107], [132, 135], [158, 161]]) { fill(a, b, 13, 14, " "); arc(a - 1, 11, b - a + 3); }
-    fill(34, 38, 11, 12, "#"); fill(62, 64, 11, 12, "#"); fill(65, 66, 10, 12, "#"); fill(90, 94, 11, 12, "#"); fill(116, 119, 12, 12, "#"); fill(144, 147, 11, 12, "#");
-    fill(44, 45, 12, 12, "x"); fill(112, 114, 12, 12, "x"); set(70, 12, "x"); set(128, 12, "x"); set(152, 12, "x");
-    plat(14, 9, 4); coins(14, 8, 4); plat(28, 9, 3, "?"); plat(42, 8, 4); coins(42, 7, 4); plat(56, 9, 3); plat(70, 8, 4); coins(70, 7, 4); plat(84, 8, 3, "?");
-    plat(98, 9, 4); coins(98, 8, 4); plat(120, 8, 4); coins(120, 7, 4); plat(124, 10, 2); plat(138, 9, 3, "?"); plat(150, 8, 4); coins(150, 7, 4); plat(166, 9, 3); plat(170, 7, 3); coins(170, 6, 3);
-    set(29, 9, "S"); set(85, 8, "O"); set(139, 9, "S");
-    return { arena: { wall: 188, lock: 192 }, movers: [[104, 10, 2, 3, 0, .02]], goal: 211, spawns: S("205F 20w 30w 36k 44r 54w 60r 68j 72w 80r 86w 92j 96k 100w 110r 116w 126j 130r 138w 148r 156w 164r 168j 172w 24v 66v 98v 142v 160s 90s 40e 122e") };
+    for (let x = 0; x < 165; x++) { const d = Math.round(Math.sin(x / 6) * 1.1 + Math.sin(x / 2.7)); if (d > 0 && x > 4) fill(x, x, 12, 12, "#"); } // ondulaciones de la duna
+    const pyr = (c0, c1, top) => { for (let x = c0; x <= c1; x++) { const k = Math.min(x - c0, c1 - x), h = Math.min(13 - top, 1 + Math.floor(k / 2)); fill(x, x, 13 - h, 13, "#"); } };
+    pyr(66, 90, 6); pyr(124, 146, 7);
+    for (const [a, b] of [[28, 31], [52, 55], [104, 107], [112, 115], [152, 155], [168, 171]]) { fill(a, b, 13, 14, "~"); fill(a, b, 12, 12, " "); }
+    for (const c of [40, 46, 96, 120, 160]) set(c, surface(c) - 1, "x");
+    plat(14, 9, 3, "?"); coins(14, 8, 3); plat(34, 8, 4); coins(34, 7, 4); plat(58, 8, 3); coins(58, 7, 3); plat(78, 3, 4, "?"); coins(78, 2, 4); plat(98, 9, 3, "?"); plat(108, 9, 3); coins(108, 8, 3); plat(136, 3, 4); coins(136, 2, 4); plat(156, 8, 3, "?"); plat(163, 7, 3); coins(163, 6, 3);
+    set(15, 9, "S"); set(99, 9, "O"); set(157, 8, "S");
+    return { arena: { wall: 188, lock: 192 }, movers: [], goal: 211, spawns: S("205F 10w 17r 24j 35w 46r 50k 60w 63j 70r 80w 88r 95j 108w 112k 125r 130w 136j 144r 158w 164k 175r 180w 20v 56v 92v 148v 40s 116s 84e 160e") };
   } },
-  { name: "Ciudad en llamas", theme: "city", hard: true, build() {
-    const B = [[0, 11, 13], [14, 22, 11], [25, 31, 10], [35, 42, 12], [45, 50, 10], [54, 62, 8], [65, 70, 10], [74, 82, 11], [86, 91, 9], [95, 103, 12], [106, 111, 10], [115, 120, 8], [124, 133, 11], [137, 142, 9], [146, 152, 12], [156, 161, 10], [165, 171, 8], [175, 214, 12]];
-    for (const [a, b, t] of B) fill(a, b, t, 14, "#");
-    for (let i = 0; i < B.length - 1; i++) { const [, b1, t1] = B[i], [a2, , t2] = B[i + 1]; arc(b1, Math.min(t1, t2) - 2, a2 - b1 + 1); }
-    set(48, 9, "^"); set(98, 11, "^"); set(158, 9, "^"); set(28, 9, "^");
-    plat(18, 8, 3, "?"); plat(56, 5, 3); coins(56, 4, 3); plat(100, 8, 3, "?"); plat(130, 7, 3); coins(130, 6, 3); plat(150, 9, 2); plat(168, 5, 4); coins(168, 4, 4); plat(78, 7, 3); coins(78, 6, 3);
-    set(19, 8, "S"); set(101, 8, "O");
-    return { arena: { wall: 188, lock: 192 }, movers: [[112, 9, 2, 4, 0, .02]], goal: 211, spawns: S("205T 16w 20r 27j 38w 40r 47k 56w 58r 67w 76r 80j 88w 93k 98r 108w 117r 128j 138w 144r 148k 158w 168r 178w 182r 30v 70v 118v 150v 100s 60e 130e") };
+  { name: "Selva podrida", theme: "jungle", hard: true, build() { // islas de tierra sobre veneno, un río para nadar y copas de árboles
+    const T = [[0, 10, 13], [14, 21, 12], [25, 30, 13], [34, 40, 11], [44, 49, 12], [53, 60, 13], [64, 69, 11], [73, 79, 11], [93, 99, 11], [103, 108, 12], [112, 117, 13], [121, 126, 12], [130, 134, 11], [138, 145, 12], [149, 156, 13], [160, 164, 12], [168, 172, 13], [176, 214, 13]];
+    land(T); gaps(T);
+    fill(80, 92, 12, 13, "W"); fill(80, 92, 14, 14, "#"); fill(80, 92, 11, 11, " "); // río
+    plat(16, 8, 3, "?"); plat(26, 9, 4); coins(26, 8, 4); plat(36, 6, 3); coins(36, 5, 3); plat(46, 9, 3, "?"); plat(55, 7, 4); coins(55, 6, 4); plat(66, 7, 3); plat(82, 9, 3); coins(82, 8, 3); plat(104, 8, 3, "?"); plat(114, 9, 4); coins(114, 8, 4); plat(131, 7, 3); coins(131, 6, 3); plat(150, 9, 3, "?"); plat(161, 8, 3); coins(161, 7, 3);
+    set(17, 8, "S"); set(47, 9, "O"); set(105, 8, "S"); set(151, 9, "S");
+    return { arena: { wall: 188, lock: 192 }, movers: [], goal: 211, spawns: S("205T 4w 8r 16w 19j 27w 36j 41w 46r 55w 58j 66r 75k 96w 105j 114w 119r 123w 132j 140r 143k 151w 158j 162r 170w 178r 20v 48v 108v 140v 38s 118s 96e 156e") };
   } },
-  { name: "Pantano nocturno", theme: "swamp", hard: true, build() {
-    fill(0, COLS - 1, 13, 14, "#");
-    for (const [a, b] of [[12, 16], [30, 34], [46, 52], [64, 67], [82, 90], [138, 141], [156, 162], [174, 177]]) {
-      fill(a, b, 13, 14, "~"); const n = b - a + 1;
-      if (n > 5) { const m = a + Math.floor(n / 2) - 1; plat(m, 11, 2); coins(m, 10, 2); } else arc(a - 1, 11, n + 2);
-    }
-    fill(22, 25, 12, 12, "#"); fill(58, 61, 11, 12, "#"); fill(94, 97, 12, 12, "#"); fill(130, 133, 11, 12, "#"); fill(148, 151, 12, 12, "#"); fill(166, 169, 12, 12, "#");
-    fill(116, 124, 11, 13, "W"); fill(116, 124, 14, 14, "#"); fill(114, 115, 11, 12, "#"); fill(125, 126, 11, 12, "#"); // laguna
-    plat(8, 9, 3); coins(8, 8, 3); plat(26, 9, 4, "?"); plat(40, 8, 3); coins(40, 7, 3); plat(70, 9, 3); coins(70, 8, 3); plat(100, 8, 3, "?"); plat(104, 10, 3); plat(142, 8, 4); coins(142, 7, 4); plat(172, 9, 3, "?");
-    set(27, 9, "S"); set(101, 8, "O"); set(173, 9, "S");
-    return { arena: { wall: 188, lock: 192 }, movers: [[138, 10, 2, 3, 0, .02]], goal: 211, spawns: S("205X 9w 20j 28w 38j 44r 56j 62w 74j 80r 94j 98w 106j 112w 128j 134r 144j 152w 168j 170r 180w 36s 76s 108s 146s 90v 130v 62e 152k 100k") };
+  { name: "Parque de diversiones", theme: "carnival", hard: true, build() { // huecos enormes que se cruzan en plataformas móviles y resortes
+    const T = [[0, 20, 13], [27, 38, 13], [45, 56, 12], [63, 72, 13], [79, 90, 12], [97, 106, 13], [113, 124, 12], [131, 140, 13], [147, 214, 13]];
+    land(T); gaps(T);
+    set(32, 12, "^"); set(50, 11, "^"); set(68, 12, "^"); set(84, 11, "^"); set(101, 12, "^"); set(118, 11, "^"); set(135, 12, "^");
+    plat(30, 9, 3, "?"); plat(35, 6, 3); coins(35, 5, 3); plat(48, 7, 4); coins(48, 6, 4); plat(66, 9, 3, "?"); plat(70, 6, 3); coins(70, 5, 3); plat(82, 7, 4); coins(82, 6, 4); plat(100, 9, 3, "?"); plat(116, 7, 3); coins(116, 6, 3); plat(133, 6, 4); coins(133, 5, 4); plat(150, 9, 3, "?");
+    set(31, 9, "S"); set(67, 9, "O"); set(101, 9, "S"); set(151, 9, "S"); set(6, 12, "x"); set(60 + 10, 12, "x");
+    const mv = [[21, 12, 2, 4, 0, .02], [39, 12, 2, 4, 0, .02], [57, 11, 2, 4, 0, .022], [73, 11, 2, 4, 0, .02], [91, 12, 2, 4, 0, .022], [107, 11, 2, 4, 0, .02], [125, 12, 2, 4, 0, .024], [141, 12, 2, 4, 0, .02]];
+    return { arena: { wall: 188, lock: 192 }, movers: mv, goal: 211, spawns: S("205X 6w 12r 18j 30w 35r 48j 54w 66r 70k 82w 86j 100r 104w 116j 120k 134w 150r 156j 162w 168k 174r 14v 50v 84v 118v 32s 110s 66e 136e") };
   } },
-  { name: "Laboratorio secreto", theme: "lab", hard: true, build() {
-    fill(0, COLS - 1, 0, 1, "#"); fill(0, COLS - 1, 13, 14, "#");
-    for (const [a, b] of [[28, 32], [64, 69], [104, 108], [142, 147]]) fill(a, b, 13, 14, "~");
-    for (const [a, b] of [[16, 18], [48, 51], [84, 87], [122, 125], [160, 162]]) { fill(a, b, 12, 12, "x"); arc(a - 1, 9, b - a + 3); }
-    fill(38, 39, 2, 9, "#"); fill(76, 77, 2, 8, "#"); fill(112, 113, 2, 9, "#"); fill(152, 153, 2, 8, "#");
-    fill(56, 57, 11, 12, "#"); fill(94, 95, 11, 12, "#"); fill(96, 97, 10, 12, "#"); fill(132, 133, 11, 12, "#"); fill(170, 171, 11, 12, "#");
-    plat(10, 9, 3, "?"); plat(23, 9, 3); coins(23, 8, 3); plat(44, 8, 4, "F"); coins(44, 7, 4); plat(70, 8, 3); coins(70, 7, 3); plat(88, 9, 3, "?"); plat(130, 8, 4); coins(130, 7, 4); plat(166, 9, 3, "?");
-    set(11, 9, "S"); set(89, 9, "O"); set(167, 9, "S");
-    return { arena: { wall: 188, lock: 192 }, movers: [[64, 11, 2, 3, 0, .02], [136, 10, 2, 0, 3, .025]], goal: 211, spawns: S("205G 12w 24r 36b 42w 52r 60b 72w 80r 90b 100r 110w 118b 128r 136w 148b 156r 164w 174b 180r 20e 66k 92e 132v 150k 174v") };
-  } },
-  { name: "El regreso del Rey", theme: "lair", boss: true, hard: true, build() {
-    fill(0, COLS - 1, 13, 14, "#");
-    for (const [a, b] of [[14, 18], [30, 35], [48, 52], [64, 70], [84, 89], [102, 108], [120, 124], [136, 141]]) {
-      fill(a, b, 13, 14, "~"); const n = b - a + 1;
-      if (n > 5) { const m = a + Math.floor(n / 2) - 1; plat(m, 10, 2); coins(m, 9, 2); } else arc(a - 1, 11, n + 2);
-    }
-    for (const [a, b] of [[40, 42], [58, 60], [112, 114], [128, 130]]) fill(a, b, 12, 12, "x");
-    fill(76, 77, 11, 12, "#"); fill(78, 79, 10, 12, "#"); fill(94, 95, 11, 12, "#"); fill(96, 97, 10, 12, "#"); set(72, 12, "^"); set(146, 12, "^");
-    plat(22, 9, 4, "F"); coins(22, 8, 4); plat(44, 9, 3, "?"); plat(80, 7, 4); coins(80, 6, 4); plat(100, 9, 3, "?"); plat(116, 6, 3); coins(116, 5, 3); plat(132, 8, 4, "F"); coins(132, 7, 4);
-    plat(165, 9, 3); plat(174, 9, 3, "?");
-    set(45, 9, "S"); set(175, 9, "S"); set(101, 9, "O");
-    return { arena: { wall: 155, lock: 161 }, movers: [[84, 10, 2, 5, 0, .02], [102, 10, 2, 5, 0, .018], [136, 9, 2, 4, 0, .022]], goal: 186, spawns: S("10w 20r 26j 40b 46r 56j 62w 74r 78b 92j 98r 112r 116j 126b 132r 146j 150b 152r 178B 54v 100v 118s 144e 134k 66k 24v") };
+  { name: "Luna zombi", theme: "moon", boss: true, hard: true, build() { // baja gravedad: los saltos son enormes y los cráteres, anchos
+    const T = [[0, 12, 13], [19, 28, 12], [34, 42, 11], [48, 53, 13], [59, 70, 10], [76, 83, 12], [89, 97, 9], [103, 110, 12], [116, 122, 13], [128, 137, 11], [143, 150, 12], [155, 214, 13]];
+    land(T); gaps(T);
+    plat(15, 9, 3); coins(15, 8, 3); plat(30, 7, 3); coins(30, 6, 3); plat(55, 6, 3); coins(55, 5, 3); plat(72, 5, 3); coins(72, 4, 3); plat(85, 7, 3); plat(99, 5, 3); coins(99, 4, 3); plat(124, 7, 3); coins(124, 6, 3); plat(139, 8, 3);
+    plat(24, 9, 3, "?"); plat(63, 6, 3, "?"); plat(91, 5, 3, "?"); plat(130, 8, 3, "?"); plat(166, 9, 3); plat(174, 9, 3, "?");
+    set(25, 9, "O"); set(64, 6, "S"); set(92, 5, "S"); set(131, 8, "O"); set(175, 9, "S"); set(38, 10, "x"); set(66, 9, "x"); set(106, 11, "x");
+    return { arena: { wall: 155, lock: 161 }, movers: [[43, 10, 2, 3, 0, .02], [112, 11, 2, 3, 0, .02]], goal: 186, spawns: S("178B 5w 10r 22j 26w 36r 40j 62w 66b 70r 78j 82w 92b 96r 105j 110w 118r 130b 134r 146j 150w 20v 64v 100v 126v 30s 98s 72k 114k 146e 38e") };
   } }
 );
 const NL = LEVELS.length; // el modo infinito es el casillero NL; los niveles propios usan NL+1
@@ -676,7 +677,7 @@ function movePlayer(p0) { // movimiento puro del jugador (ctx ya fijó K y TP); 
   p0.wet = wet;
   const p = p0, acc = (p.ground ? 0.35 : 0.22) * TIER.acc[p.tier] * (wet ? .6 : 1), max = TIER.max[p.tier] * (wet ? .65 : 1);
   if (p.growing && net.role !== "guest") tryGrow();
-  if (K.left) { p.vx -= acc; p.face = -1; } else if (K.right) { p.vx += acc; p.face = 1; } else p.vx *= p.ground ? 0.78 : 0.95;
+  if (K.left) { p.vx -= acc; p.face = -1; } else if (K.right) { p.vx += acc; p.face = 1; } else p.vx *= p.ground ? (L.theme === "snow" ? 0.95 : 0.78) : 0.95; // en la nieve patina
   p.vx = Math.max(-max, Math.min(max, p.vx));
   p.coyote = p.ground ? 6 : p.coyote - 1;
   if (p.ground) p.jumps = 0; else if (p.coyote <= 0 && p.jumps === 0) p.jumps = 1; // si se cae de un borde, queda el salto de aire
@@ -688,7 +689,7 @@ function movePlayer(p0) { // movimiento puro del jugador (ctx ya fijó K y TP); 
   }
   if (!K.jump) { p.jumped = false; if (p.vy < -2 && !p.springT) p.vy += 0.35; } // salto variable
   if (p.springT) p.springT--;
-  p.vy = wet ? Math.min(p.vy + 0.1, 1.4) : Math.min(p.vy + 0.28, 6.5);
+  p.vy = wet ? Math.min(p.vy + 0.1, 1.4) : Math.min(p.vy + (L.theme === "moon" ? 0.17 : 0.28), 6.5);
   const vyb = p.vy, pb = p.y + p.h; collideX(p); collideY(p);
   p.onMover = null;
   const ices = zombies.filter((z) => z.frozen > 0 && !z.dead).map((z) => ({ x: z.x, y: z.y, w: z.w, vx: 0, vy: 0, ice: true }));
@@ -923,6 +924,77 @@ const AMB = {
   embers() { for (let i = 0; i < 34; i++) { const y = H - (rnd(i) * H + time * (.4 + rnd(i + 2) * .6)) % H, x = ((rnd(i + 5) * W + Math.sin(time * .03 + i) * 10 - cam * .4) % W + W) % W; g.globalAlpha = .3 + (y / H) * .6; R(x, y, 1 + (i % 2), 1 + (i % 2), i % 3 ? "#ff8a2a" : "#ffd060"); } g.globalAlpha = 1; },
   drips() { for (let i = 0; i < 16; i++) { const sx = (i * 211 + 37) % (COLS * T) - Math.floor(cam); if (sx < -4 || sx > W) continue; R(sx - 1, 32, 3, 2, "#8ab02a"); R(sx, 34 + (time * 1.4 + i * 53) % 176, 1, 3, "#c6ff3a"); } },
 };
+Object.assign(MID, {
+  peaks() {
+    layer(.3, 170, (x, i) => {
+      const h = 80 + Math.round(rnd(i) * 60), w = 120 + Math.round(rnd(i + 3) * 50), b = 212, px = x + w * .45;
+      g.fillStyle = "#26345a"; g.beginPath(); g.moveTo(x, b); g.lineTo(px, b - h); g.lineTo(x + w * .62, b - h + 12); g.lineTo(x + w, b); g.fill();
+      g.fillStyle = "#1a2444"; g.beginPath(); g.moveTo(px, b - h); g.lineTo(x + w * .62, b - h + 12); g.lineTo(x + w, b); g.lineTo(x + w * .55, b); g.fill();
+      g.fillStyle = "#e4eeff"; g.beginPath(); g.moveTo(px, b - h); g.lineTo(px - 14, b - h + 24); g.lineTo(px - 6, b - h + 20); g.lineTo(px + 2, b - h + 30); g.lineTo(px + 10, b - h + 18); g.lineTo(x + w * .62, b - h + 12); g.fill();
+    });
+  },
+  dunes() {
+    const sx = Math.round(W * .72 - cam * .03); glow(sx, 120, 90, "#ffd070", .5); g.fillStyle = "#ffe8a0"; g.beginPath(); g.arc(sx, 120, 24, 0, 7); g.fill();
+    layer(.22, 280, (x, i) => { const w = 110 + Math.round(rnd(i) * 40), h = 60 + Math.round(rnd(i + 1) * 30); g.fillStyle = "#7a2a3a"; g.beginPath(); g.moveTo(x, 205); g.lineTo(x + w / 2, 205 - h); g.lineTo(x + w, 205); g.fill(); g.fillStyle = "#5a1c2c"; g.beginPath(); g.moveTo(x + w / 2, 205 - h); g.lineTo(x + w, 205); g.lineTo(x + w * .55, 205); g.fill(); });
+    layer(.4, 150, (x, i) => { g.fillStyle = "#5a2030"; g.beginPath(); g.ellipse(x + 60, 214, 100, 26 + rnd(i) * 16, 0, Math.PI, 0); g.fill(); });
+  },
+  jungle() {
+    layer(.3, 96, (x, i) => {
+      const col = "#04180f", tx = x + Math.round(rnd(i) * 40), th = 90 + Math.round(rnd(i + 2) * 50), b = 212;
+      R(tx, b - th, 9, th, col); g.fillStyle = col; for (let k = 0; k < 6; k++) { g.beginPath(); g.ellipse(tx + 4 + (k - 2.5) * 12, b - th + (k % 3) * 6, 18, 12, 0, 0, 7); g.fill(); }
+      for (let k = 0; k < 6; k++) R(tx - 22 + k * 9 + Math.round(Math.sin(time * .03 + k + i) * 1.5), b - th + 8, 1, 22 + ((k * 11 + i) % 26), "#0a2a1a");
+    });
+  },
+  ferris() {
+    const cx = Math.round(W * .5 - cam * .08), cy = 118, r = 62, a0 = time * .004;
+    g.strokeStyle = "#2a0c3e"; g.lineWidth = 2; g.beginPath(); g.arc(cx, cy, r, 0, 7); g.stroke(); g.beginPath(); g.arc(cx, cy, r * .55, 0, 7); g.stroke();
+    for (let k = 0; k < 8; k++) { const a = a0 + k * Math.PI / 4, bx = cx + Math.cos(a) * r, by = cy + Math.sin(a) * r; g.beginPath(); g.moveTo(cx, cy); g.lineTo(bx, by); g.stroke(); R(bx - 5, by, 10, 8, k % 2 ? "#6a1a5a" : "#8a2a3a"); R(bx - 5, by, 10, 2, "#2a0c3e"); }
+    g.beginPath(); g.moveTo(cx - 26, 212); g.lineTo(cx, cy); g.lineTo(cx + 26, 212); g.stroke();
+    layer(.35, 200, (x, i) => { g.fillStyle = "#240a38"; g.beginPath(); g.moveTo(x, 205); g.lineTo(x + 20, 160); g.lineTo(x + 44, 205); g.fill(); R(x + 6, 188, 32, 17, "#240a38"); R(x + 20, 150, 1, 10, "#240a38"); R(x + 21, 150, 8, 5, i % 2 ? "#ff5a8a" : "#ffcc33"); });
+  },
+  lunar() {
+    layer(.25, 200, (x, i) => { const w = 70 + Math.round(rnd(i) * 50), h = 20 + Math.round(rnd(i + 1) * 20); g.fillStyle = "#0e1028"; g.beginPath(); g.ellipse(x + w / 2, 210, w, h, 0, Math.PI, 0); g.fill(); });
+    layer(.4, 300, (x, i) => { if (rnd(i + 4) > .35) { g.fillStyle = "#121438"; g.beginPath(); g.ellipse(x + 30, 206, 24, 22, 0, Math.PI, 0); g.fill(); R(x + 6, 206, 48, 6, "#121438"); R(x + 28, 168, 1, 14, "#121438"); R(x + 26, 166, 5, 3, Math.sin(time * .08 + i) > 0 ? "#ff4a4a" : "#5a1a1a"); } });
+  },
+});
+Object.assign(NEAR, {
+  pines() {
+    layer(.6, 60, (x, i) => {
+      const col = "#0a1426", h = 40 + Math.round(rnd(i) * 40), b = 214, cx = x + 10 + Math.round(rnd(i + 3) * 20);
+      g.fillStyle = col; for (let k = 0; k < 4; k++) { const y0 = b - h + k * (h / 4.5), w = 8 + k * 5; g.beginPath(); g.moveTo(cx, y0 - 6); g.lineTo(cx + w, y0 + h / 4.2); g.lineTo(cx - w, y0 + h / 4.2); g.fill(); } R(cx - 1, b - 8, 3, 8, col);
+    });
+  },
+  cacti() {
+    layer(.6, 90, (x, i) => {
+      const col = "#2a0c1c", h = 30 + Math.round(rnd(i) * 26), cx = x + 20 + Math.round(rnd(i + 2) * 30), b = 214;
+      if (rnd(i + 5) > .3) { R(cx, b - h, 6, h, col); R(cx - 8, b - h * .6, 4, 10, col); R(cx - 8, b - h * .6 + 8, 12, 3, col); R(cx + 10, b - h * .75, 4, 10, col); R(cx + 5, b - h * .75 + 8, 9, 3, col); }
+      R(x + 60, 208, 14, 6, col); R(x + 62, 204, 10, 4, col);
+    });
+  },
+  ferns() {
+    layer(.65, 56, (x, i) => {
+      for (let k = 0; k < 3; k++) { const bx = x + k * 14 + 4, h = 18 + Math.round(rnd(i * 3 + k) * 18); g.strokeStyle = "#021008"; g.lineWidth = 2; g.beginPath(); g.moveTo(bx, 214); g.quadraticCurveTo(bx + Math.sin(time * .03 + k + i) * 2 + (k - 1) * 8, 214 - h * .6, bx + (k - 1) * 14, 214 - h); g.stroke(); }
+    });
+  },
+  lights() {
+    layer(.6, 110, (x, i) => {
+      const col = "#12031e"; R(x, 150, 2, 64, col); R(x + 108, 150, 2, 64, col);
+      g.strokeStyle = col; g.lineWidth = 1; g.beginPath(); g.moveTo(x + 1, 152); g.quadraticCurveTo(x + 55, 172, x + 109, 152); g.stroke();
+      for (let k = 0; k < 7; k++) { const t = (k + .5) / 7, bx = x + 1 + t * 108, by = 152 + Math.sin(t * Math.PI) * 14, on = Math.sin(time * .1 + k + i) > -.5; glow(bx, by + 2, 7, ["#ff5a8a", "#ffcc33", "#5ae0ff"][k % 3], on ? .55 : .12); }
+      R(x + 40, 196, 30, 18, col); R(x + 44, 188, 22, 8, col);
+    });
+  },
+  rocks() {
+    layer(.6, 120, (x, i) => { const col = "#0a0b22", w = 20 + Math.round(rnd(i) * 26); g.fillStyle = col; g.beginPath(); g.ellipse(x + 40, 214, w, 12 + rnd(i + 1) * 10, 0, Math.PI, 0); g.fill(); if (rnd(i + 3) > .6) { R(x + 90, 176, 1, 38, col); R(x + 84, 174, 13, 3, col); R(x + 92, 168, 1, 7, col); } });
+  },
+});
+Object.assign(AMB, {
+  snow() { for (let i = 0; i < 60; i++) { const y = (rnd(i + 3) * H + time * (.5 + rnd(i) * .6)) % H, x = ((rnd(i) * W + Math.sin(time * .02 + i) * 14 - cam * .5 - time * .15) % W + W) % W; g.globalAlpha = .55 + rnd(i + 9) * .4; R(x, y, 1 + (i % 3 === 0), 1 + (i % 3 === 0), "#f4faff"); } g.globalAlpha = 1; },
+  sand() { for (let i = 0; i < 40; i++) { const y = 20 + rnd(i + 3) * 190, x = ((rnd(i) * W * 1.5 - time * (1.2 + rnd(i + 1) * 1.4) - cam * .4) % W + W) % W; g.globalAlpha = .22 + rnd(i + 5) * .2; R(x, y, 6 + (i % 5) * 3, 1, "#ffe0a0"); } g.globalAlpha = 1; },
+  spores() { for (let i = 0; i < 34; i++) { const x = ((rnd(i) * W * 2 - cam * .7 + Math.sin(time * .01 + i) * 20) % W + W) % W, y = 40 + ((rnd(i + 1) * 170 - time * (.15 + rnd(i + 4) * .25)) % 170 + 170) % 170, a = (Math.sin(time * .05 + i * 3) + 1) / 2; glow(x, y, 6, i % 3 ? "#9aff6a" : "#ff9ae8", a * .5); R(x, y, 1, 1, "#f0ffd0"); } },
+  confetti() { for (let i = 0; i < 46; i++) { const y = (rnd(i + 3) * H + time * (.4 + rnd(i) * .5)) % H, x = ((rnd(i) * W + Math.sin(time * .04 + i) * 10 - cam * .4) % W + W) % W; g.globalAlpha = .8; R(x, y, 2, 2, ["#ff5a8a", "#ffcc33", "#5ae0ff", "#9aff6a"][i % 4]); } g.globalAlpha = 1; },
+  stardust() { for (let i = 0; i < 30; i++) { const x = ((rnd(i) * W - cam * .5) % W + W) % W, y = 30 + rnd(i + 1) * 170, a = (Math.sin(time * .06 + i * 2) + 1) / 2; g.globalAlpha = a * .8; R(x, y, 1, 1, "#cfe0ff"); } g.globalAlpha = 1; },
+});
 function drawLab() {
   layer(.5, 64, (x, i) => {
     R(x, 32, 62, 180, "#141c30"); R(x, 32, 62, 1, "#1e2a44"); for (const [a, b] of [[2, 40], [59, 40], [2, 204], [59, 204]]) R(x + a, b, 1, 1, "#2a3654");
@@ -968,7 +1040,9 @@ function drawDeco(x, y, k) {
     g.save(); g.translate(cx, cy + 3);
     g.beginPath(); g.moveTo(-2.6, 0); g.quadraticCurveTo(-3.2, -3.6 - fl, 0, -7 - fl * 2); g.quadraticCurveTo(3.2, -3.6, 2.6, 0); g.closePath(); g.fillStyle = vgrad(g, -7, 0, [[0, "#ffd060"], [1, "#ff6a10"]]); g.fill();
     g.beginPath(); g.moveTo(-1.2, 0); g.quadraticCurveTo(-1.4, -2, 0, -4 - fl); g.quadraticCurveTo(1.4, -2, 1.2, 0); g.closePath(); g.fillStyle = "#fff0b0"; g.fill(); g.restore();
-  } else if (k === "mushroom") glow(x + 8, y + 8, 14, "#c07aff", .25 + Math.sin(time * .05 + x) * .1);
+  } else if (k === "lamp") glow(x + 8, y + 3, 14, "#ffd060", .45 + Math.sin(time * .1 + x) * .1);
+  else if (k === "antenna") glow(x + 8, y + 2, 7, "#ff4040", Math.sin(time * .1 + x) > 0 ? .6 : .1);
+  else if (k === "mushroom") glow(x + 8, y + 8, 14, "#c07aff", .25 + Math.sin(time * .05 + x) * .1);
   else if (k === "tank") { glow(x + 8, y + 10, 12, "#c6ff3a", .22 + Math.sin(time * .1 + x) * .08); const bt = (time + x * 3) % 50; g.globalAlpha = .7; R(x + 7 + (x % 3), y + 14 - bt * .2, 1, 1, "#e8ffa0"); g.globalAlpha = 1; }
 }
 function drawGroundOld(px, py, x, y, r) {
@@ -1022,7 +1096,7 @@ function drawGround(px, py, x, y, r) {
     const ts = top && y > 1, bs = bottom; c = tex("lb" + (+ts) + (+bs) + v, T, T, (x) => panelArt(x, T, v, d, ts, bs));
   } else if (th === "lair") {
     const lava = r > .7; c = tex("lr" + (+top) + (+lava) + v, T, T, (x) => lairStoneArt(x, T, v, [d[1], d[3], d[2]], top, lava));
-  } else if (top) { oy = 6; h = T + 6; c = tex("gt" + v, T, T + 6, (x) => { x.translate(0, 6); dirtArt(x, T, v, d); grassArt(x, T, v, gs, 0, th === "swamp"); }); }
+  } else if (top) { oy = 6; h = T + 6; c = tex("gt" + v, T, T + 6, (x) => { x.translate(0, 6); dirtArt(x, T, v, d); grassArt(x, T, v, gs, 0, th === "swamp" || th === "jungle"); }); }
   else c = tex("gf" + v, T, T, (x) => dirtArt(x, T, v + 4, [d[1], d[2], d[2], d[3]]));
   g.drawImage(c, px, py - oy, T, h);
 }
@@ -1030,8 +1104,8 @@ function drawPlat(px, py, x, y, r) {
   const th = L.theme, v = (r * 4) | 0, P = TH.plat;
   let c;
   if (th === "city") c = tex("pc", T, T, (x) => girderArt(x, T, 0, P));
-  else if (th === "swamp") { const l = map[y]?.[x - 1] !== "=", rt = map[y]?.[x + 1] !== "="; c = tex("ps" + (+l) + (+rt) + v, T, T, (x) => plankArt(x, T, v, P, true, l, rt)); }
-  else if (th === "lab") c = tex("pl", T, T, (x) => gratingArt(x, T, 0, P));
+  else if (th === "swamp" || th === "jungle") { const l = map[y]?.[x - 1] !== "=", rt = map[y]?.[x + 1] !== "="; c = tex("ps" + (+l) + (+rt) + v, T, T, (x) => plankArt(x, T, v, P, true, l, rt)); }
+  else if (th === "lab" || th === "moon") c = tex("pl", T, T, (x) => gratingArt(x, T, 0, P));
   else if (th === "lair") { const lava = r > .6; c = tex("pr" + (+lava) + v, T, T, (x) => lairStoneArt(x, T, v, P, true, lava)); }
   else c = tex("pm" + v, T, T, (x) => brickArt(x, T, v, P, "#2a120c", .22));
   g.drawImage(c, px, py, T, T);
@@ -1377,7 +1451,7 @@ function enterEditor(d) {
 function showEd(on) {
   document.body.classList.toggle("editing", on);
   if (on) document.querySelectorAll("#edTools button").forEach((b, i) => b.classList.toggle("on", i === edTool));
-  const th = document.getElementById("edTheme"); if (th) th.textContent = "Tema: " + { cemetery: "cementerio", city: "ciudad", swamp: "pantano", lab: "laboratorio", lair: "guarida" }[edData.theme];
+  const th = document.getElementById("edTheme"); if (th) th.textContent = "Tema: " + { cemetery: "cementerio", city: "ciudad", swamp: "pantano", lab: "laboratorio", lair: "guarida", snow: "nieve", desert: "desierto", jungle: "selva", carnival: "parque", moon: "luna" }[edData.theme];
 }
 function edPaint(e, first) {
   const r = cv.getBoundingClientRect(), x = (e.clientX - r.left) / r.width * W + edCam, y = (e.clientY - r.top) / r.height * H;
@@ -1448,7 +1522,7 @@ function drawBgSoft() { // el fondo se dibuja a media resolución y se estira su
   const main = g; g = bgG; g.setTransform(SC / 2, 0, 0, SC / 2, 0, 0); drawBg(); g = main;
   g.save(); g.setTransform(1, 0, 0, 1, 0, 0); g.drawImage(bgC, 0, 0, cv.width, cv.height); g.restore();
 }
-const GRADE = { cemetery: ["#5a6cc0", .2], city: ["#c08a5a", .16], swamp: ["#5ac078", .2], lab: ["#5ab8c8", .16], lair: ["#d04a20", .24] };
+const GRADE = { cemetery: ["#5a6cc0", .2], city: ["#c08a5a", .16], swamp: ["#5ac078", .2], lab: ["#5ab8c8", .16], lair: ["#d04a20", .24], snow: ["#8ab8ff", .18], desert: ["#ffb060", .2], jungle: ["#50d890", .2], carnival: ["#d070ff", .2], moon: ["#8aa0ff", .16] };
 function postFX() {
   const dw = cv.width, dh = cv.height;
   g.save(); g.setTransform(1, 0, 0, 1, 0, 0);
