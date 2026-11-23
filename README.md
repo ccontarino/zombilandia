@@ -16,6 +16,7 @@ Platformer de zombies para el navegador, hecho con canvas y sin librerías. Pers
 - **Modo bestia x2:** si agarrás otra jeringa estando en modo bestia, el héroe se hace el doble de grande: corre todavía más rápido y el rayo es rosa, enorme, llega más lejos y pega x5. Cada golpe te baja un nivel (x2 → bestia → normal).
 - **Escudo:** una burbuja que sale de un bloque `?` en cada nivel y aguanta un golpe. Se rompe antes de que pierdas el modo bestia o una vida.
 - **Tienda:** entre nivel y nivel gastás los cerebros en vida extra (30), escudo (25), jeringa (50) o rayo largo para toda la partida (80).
+- **Plataformas y agua:** plataformas que se mueven (grúas, ascensores, troncos, cadenas sobre la lava), plataformas rajadas que se derrumban cuando las pisás y vuelven a aparecer, y una laguna en el pantano donde se nada tocando saltar.
 - **Progreso:** el juego recuerda hasta qué nivel llegaste; en la pantalla de inicio tocá ⚡ (o apretá el número del nivel) para seguir desde ahí.
 - **Reglas:** saltale encima a los zombis para eliminarlos, juntá cerebros (son la moneda de la tienda), abrí los bloques `?` pegándoles desde abajo y llegá a la bandera.
 

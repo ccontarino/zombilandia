@@ -1,7 +1,7 @@
 "use strict";
 // Zombilandia: platformer de zombies en canvas, sin librerías. Personajes y arte propios (rects de píxel).
 // 5 niveles: cementerio, ciudad en ruinas, pantano tóxico, laboratorio y la guarida del Rey Zombi (jefe final).
-const VERSION = "v17"; // subir en cada publicación (también en index.html)
+const VERSION = "v18"; // subir en cada publicación (también en index.html)
 const T = 16, H = 240, ROWS = 15, COLS = 190;
 let W = 480, cache = {};
 const cv = document.getElementById("c"), g = cv.getContext("2d");
@@ -22,7 +22,7 @@ const plat = (x, y, n, ch = "=") => fill(x, x + n - 1, y, y, ch);
 const coins = (x, y, n) => { for (let i = 0; i < n; i++) if (map[y]?.[x + i] === " ") set(x + i, y, "c"); };
 const arc = (x, y, n) => { for (let i = 0; i < n; i++) if (map[y - Math.round(Math.sin(i / (n - 1) * Math.PI) * 2)]?.[x + i] === " ") set(x + i, y - Math.round(Math.sin(i / (n - 1) * Math.PI) * 2), "c"); };
 const S = (s) => s.split(" ").map((t) => [parseInt(t), { w: "walker", r: "runner", j: "jumper", b: "brute", B: "boss", v: "bat", s: "spitter", e: "shielder" }[t.slice(-1)]]);
-const solid = (tx, ty) => { if (tx < 0 || tx >= COLS) return true; if (ty < 0 || ty >= ROWS) return false; const c = map[ty][tx]; return c === "#" || c === "=" || c === "?" || c === "S" || c === "O" || c === "u" || c === "^"; };
+const solid = (tx, ty) => { if (tx < 0 || tx >= COLS) return true; if (ty < 0 || ty >= ROWS) return false; const c = map[ty][tx]; return c === "#" || c === "=" || c === "?" || c === "S" || c === "O" || c === "u" || c === "^" || c === "F"; };
 function surface(col) { let r = ROWS - 1; if (!solid(col, r)) return -1; while (r > 0 && solid(col, r - 1)) r--; return r; }
 
 const THEMES = {
@@ -44,11 +44,11 @@ const LEVELS = [
     for (const [a, b] of [[30, 32], [52, 54], [74, 77], [96, 98], [118, 122], [140, 142]]) fill(a, b, 13, 14, " ");
     plat(12, 9, 4); coins(12, 8, 4); plat(22, 10, 3, "?"); coins(22, 9, 3); plat(36, 9, 5); coins(36, 8, 5); plat(44, 7, 3); coins(44, 6, 3);
     plat(58, 10, 4); plat(63, 8, 4); coins(63, 7, 4); plat(70, 10, 3); plat(82, 9, 6); coins(82, 8, 6); plat(92, 10, 2); plat(100, 9, 3, "?"); coins(100, 8, 3);
-    plat(108, 10, 4); plat(113, 8, 4); coins(113, 7, 4); plat(126, 9, 3); plat(131, 7, 3); coins(131, 6, 3); plat(146, 10, 5); coins(146, 9, 5);
-    plat(156, 9, 3); plat(160, 7, 3); plat(164, 5, 3); coins(164, 4, 3);
+    plat(108, 10, 4); plat(113, 8, 4); coins(113, 7, 4); plat(126, 9, 3, "F"); plat(131, 7, 3); coins(131, 6, 3); plat(146, 10, 5); coins(146, 9, 5);
+    plat(156, 9, 3, "F"); plat(160, 7, 3); plat(164, 5, 3); coins(164, 4, 3);
     for (let i = 0; i < 6; i++) fill(172 + i, 172 + i, 12 - i, 12, "#");
     set(23, 10, "S"); set(101, 9, "O");
-    return { goal: 184, spawns: S("18w 27w 40w 47w 60w 66w 85w 90w 104w 110r 115w 128w 134w 148r 152w 158w 166r 170w 35v 78v 124v 160v") };
+    return { movers: [[118, 11, 2, 3, 0, .02]], goal: 184, spawns: S("18w 27w 40w 47w 60w 66w 85w 90w 104w 110r 115w 128w 134w 148r 152w 158w 166r 170w 35v 78v 124v 160v") };
   } },
   { name: "Ciudad en ruinas", theme: "city", build() {
     const B = [[0, 15, 13], [18, 27, 11], [30, 37, 9], [40, 47, 10], [51, 58, 12], [61, 66, 8], [69, 78, 11], [82, 88, 10], [92, 100, 12], [104, 110, 9], [113, 120, 7], [123, 132, 10], [136, 141, 12], [145, 152, 9], [155, 160, 11], [163, 170, 8], [173, 189, 12]];
@@ -57,7 +57,7 @@ const LEVELS = [
     set(57, 11, "^"); set(159, 10, "^"); set(26, 10, "^");
     plat(21, 6, 3, "?"); plat(72, 7, 3, "?"); plat(126, 6, 2, "?"); plat(43, 6, 3); coins(43, 5, 3); plat(85, 6, 3); coins(85, 5, 3); plat(147, 5, 4); coins(147, 4, 4);
     set(73, 7, "S"); set(127, 6, "O");
-    return { goal: 185, spawns: S("22w 34w 44r 54w 63j 73r 76w 85w 96r 107w 116j 127r 130w 148b 158r 166w 178r 181w 47e 100s 140v 168e") };
+    return { movers: [[89, 8, 3, 4, 0, .015], [133, 10, 2, 0, 3, .02]], goal: 185, spawns: S("22w 34w 44r 54w 63j 73r 76w 85w 96r 107w 116j 127r 130w 148b 158r 166w 178r 181w 47e 100s 140v 168e") };
   } },
   { name: "Pantano tóxico", theme: "swamp", build() {
     fill(0, COLS - 1, 13, 14, "#");
@@ -68,8 +68,9 @@ const LEVELS = [
     fill(20, 24, 12, 12, "#"); fill(60, 63, 11, 12, "#"); fill(88, 92, 12, 12, "#"); fill(130, 133, 11, 12, "#"); fill(160, 163, 12, 12, "#");
     plat(34, 9, 4); coins(34, 8, 4); plat(102, 8, 3, "?"); plat(118, 9, 4); coins(118, 8, 4); plat(146, 8, 3); coins(146, 7, 3); plat(172, 9, 3, "?"); plat(46, 9, 2, "?");
     for (let i = 0; i < 4; i++) fill(176 + i, 176 + i, 12 - i, 12, "#");
+    fill(78, 85, 11, 13, "W"); fill(78, 85, 14, 14, "#"); fill(76, 77, 11, 12, "#"); fill(86, 87, 11, 12, "#"); // laguna para nadar
     set(103, 8, "S"); set(173, 9, "O");
-    return { goal: 185, spawns: S("10w 22j 35w 46j 60w 62j 74r 89j 92w 104j 119w 121j 131b 148j 160r 163j 172w 38s 64v 93s 140v 150s") };
+    return { movers: [[50, 10, 2, 5, 0, .02]], goal: 185, spawns: S("10w 22j 35w 46j 60w 62j 74r 89j 92w 104j 119w 121j 131b 148j 160r 163j 172w 38s 64v 93s 140v 150s") };
   } },
   { name: "El laboratorio", theme: "lab", build() {
     fill(0, COLS - 1, 0, 1, "#"); fill(0, COLS - 1, 13, 14, "#");
@@ -78,9 +79,9 @@ const LEVELS = [
     fill(44, 45, 2, 9, "#"); fill(100, 101, 2, 9, "#"); fill(140, 141, 2, 8, "#");
     fill(62, 63, 10, 12, "#"); fill(120, 121, 9, 12, "#"); set(117, 12, "^"); set(60, 12, "^");
     plat(35, 10, 3); coins(35, 9, 3); plat(71, 10, 4); coins(71, 9, 4); plat(111, 10, 2); plat(114, 8, 2); coins(114, 7, 2); plat(151, 10, 4); coins(151, 9, 4);
-    plat(26, 8, 3, "?"); plat(80, 8, 3, "?"); plat(160, 8, 3, "?"); plat(50, 9, 3); coins(50, 8, 3);
+    plat(26, 8, 3, "?"); plat(80, 8, 3, "?"); plat(160, 8, 3, "?"); plat(50, 9, 3, "F"); coins(50, 8, 3);
     set(81, 8, "S"); set(27, 8, "O");
-    return { goal: 185, spawns: S("16w 28r 48b 66w 78r 86j 96w 105b 124r 133w 146b 158r 163j 175b 180r 40e 74v 118s 160e 172v") };
+    return { movers: [[64, 12, 2, 0, 4, .02], [112, 11, 2, 0, 3, .025]], goal: 185, spawns: S("16w 28r 48b 66w 78r 86j 96w 105b 124r 133w 146b 158r 163j 175b 180r 40e 74v 118s 160e 172v") };
   } },
   { name: "La guarida del Rey Zombi", theme: "lair", boss: true, build() {
     fill(0, COLS - 1, 13, 14, "#");
@@ -90,10 +91,10 @@ const LEVELS = [
     }
     for (const [a, b] of [[44, 46], [60, 62], [100, 102], [136, 138]]) fill(a, b, 12, 12, "x");
     fill(80, 83, 9, 12, "#"); set(77, 12, "^"); fill(118, 121, 8, 12, "#"); set(116, 12, "^");
-    plat(26, 9, 4); coins(26, 8, 4); plat(58, 8, 3, "?"); plat(84, 6, 4); coins(84, 5, 4); plat(96, 9, 3, "?"); plat(122, 6, 3); coins(122, 5, 3); plat(138, 8, 4); coins(138, 7, 4);
+    plat(26, 9, 4, "F"); coins(26, 8, 4); plat(58, 8, 3, "?"); plat(84, 6, 4); coins(84, 5, 4); plat(96, 9, 3, "?"); plat(122, 6, 3); coins(122, 5, 3); plat(138, 8, 4, "F"); coins(138, 7, 4);
     plat(165, 9, 3); plat(176, 7, 3, "?");
     set(59, 8, "S"); set(177, 7, "S"); set(97, 9, "O");
-    return { goal: 186, spawns: S("12w 25r 30j 42b 48r 59w 64j 75w 87r 98b 104j 124r 134b 141j 154r 178B 20v 50e 70v 133s 139e 146v") };
+    return { movers: [[90, 10, 2, 4, 0, .02], [108, 10, 2, 5, 0, .018], [144, 9, 2, 5, 0, .022]], goal: 186, spawns: S("12w 25r 30j 42b 48r 59w 64j 75w 87r 98b 104j 124r 134b 141j 154r 178B 20v 50e 70v 133s 139e 146v") };
   } },
 ];
 
@@ -111,7 +112,7 @@ const ZT = {
 };
 let bossCheck = null; // punto de control en la arena del jefe: si perdés ahí, volvés directo al jefe
 let mode = "title", levelIdx = 0, L, TH, goalX = 184, levelStart = 0, banner = 0, bossDead = false, arenaLocked = false, deco = [];
-let shots = [], player, zombies, items, parts, cam = 0, score = 0, lives = 3, brains = 0, time = 0, msg = "", msgT = 0, shake = 0, unlocked = 1;
+let movers = [], crumble = {}, falling = [], regrow = [], shots = [], player, zombies, items, parts, cam = 0, score = 0, lives = 3, brains = 0, time = 0, msg = "", msgT = 0, shake = 0, unlocked = 1;
 try { unlocked = Math.max(1, Math.min(LEVELS.length, +localStorage.getItem("zombilandia-nivel") || 1)); } catch {}
 const urlLevel = Math.max(1, Math.min(LEVELS.length, +new URLSearchParams(location.search).get("nivel") || 0)) || 0;
 if (urlLevel) unlocked = Math.max(unlocked, urlLevel);
@@ -125,6 +126,8 @@ function loadLevel(i) {
   levelIdx = i; L = LEVELS[i]; TH = THEMES[L.theme]; cache = {};
   for (const row of map) row.fill(" ");
   const info = L.build(); goalX = info.goal;
+  movers = (info.movers || []).map(([c, r, w, dx, dy, sp], k) => ({ x0: c * T, y0: r * T, x: c * T, y: r * T, w: w * T, h: 8, dx: dx * T, dy: dy * T, sp, t: k * 1.7, vx: 0, vy: 0 }));
+  crumble = {}; falling = []; regrow = [];
   player = { x: 40, y: 150, vx: 0, vy: 0, w: 10, h: 14, face: 1, ground: false, coyote: 0, jumps: 0, cd: 0, beam: 0, beamDir: 1, ray: null, firePrev: false, shot: 0, inv: 0, dead: 0, step: 0, springT: 0, big: false, tier: 0, want: keep, growing: keep > 0, power: keep > 0 ? 1 : 0, beamBig: false, beamTier: 0, shield: keepShield, safe: { x: 40, y: 150 } };
   zombies = [];
   info.spawns.forEach(([col, type], n) => {
@@ -445,21 +448,44 @@ function update() {
   if (shopMsgT) shopMsgT--;
   if (mode !== "play") return;
   levelTime++;
-  const p = player, acc = (p.ground ? 0.35 : 0.22) * TIER.acc[p.tier], max = TIER.max[p.tier];
+  for (const m of movers) { // plataformas móviles: van y vienen
+    m.t += m.sp; const k = (1 - Math.cos(m.t)) / 2, nx = m.x0 + m.dx * k, ny = m.y0 + m.dy * k; m.vx = nx - m.x; m.vy = ny - m.y; m.x = nx; m.y = ny;
+  }
+  const p0 = player;
+  if (p0.onMover) { p0.x += p0.onMover.vx; p0.y = p0.onMover.y - p0.h; }
+  const wet = tileAt(p0.x + p0.w / 2, p0.y + p0.h / 2) === "W"; // nadando
+  if (wet && !p0.wet) { burst(p0.x + 5, p0.y + 4, "#9ad7ff", 10); beep(300, .2, "sine", 120); }
+  p0.wet = wet;
+  const p = player, acc = (p.ground ? 0.35 : 0.22) * TIER.acc[p.tier] * (wet ? .6 : 1), max = TIER.max[p.tier] * (wet ? .65 : 1);
   if (p.growing) tryGrow();
   if (keys.left) { p.vx -= acc; p.face = -1; } else if (keys.right) { p.vx += acc; p.face = 1; } else p.vx *= p.ground ? 0.78 : 0.95;
   p.vx = Math.max(-max, Math.min(max, p.vx));
   p.coyote = p.ground ? 6 : p.coyote - 1;
   if (p.ground) p.jumps = 0; else if (p.coyote <= 0 && p.jumps === 0) p.jumps = 1; // si se cae de un borde, queda el salto de aire
   const wantJump = keys.jump || tap.jump; tap.jump = false;
-  if (wantJump && !p.jumped) {
+  if (wet) { p.jumps = 0; if (wantJump && !p.jumped) { p.vy = -3.3; p.jumped = true; burst(p.x + 5, p.y + 10, "#cfefff", 3); beep(400, .06, "sine", 600); } }
+  else if (wantJump && !p.jumped) {
     if (p.coyote > 0) { p.vy = -5.1; p.jumped = true; p.coyote = 0; p.jumps = 1; beep(330, .12, "square", 660); }
     else if (p.jumps < 2) { p.vy = -4.9; p.jumped = true; p.jumps = 2; burst(p.x + 5, p.y + 14, "#9ad7ff", 8); beep(520, .12, "square", 980); } // doble salto
   }
   if (!keys.jump) { p.jumped = false; if (p.vy < -2 && !p.springT) p.vy += 0.35; } // salto variable
   if (p.springT) p.springT--;
-  p.vy = Math.min(p.vy + 0.28, 6.5);
-  const vyb = p.vy; collideX(p); collideY(p);
+  p.vy = wet ? Math.min(p.vy + 0.1, 1.4) : Math.min(p.vy + 0.28, 6.5);
+  const vyb = p.vy, pb = p.y + p.h; collideX(p); collideY(p);
+  p.onMover = null;
+  if (p.vy >= 0) for (const m of movers) if (p.x + p.w > m.x + 1 && p.x < m.x + m.w - 1 && pb <= m.y + 4 && p.y + p.h >= m.y) { p.y = m.y - p.h; p.vy = 0; p.ground = true; p.onMover = m; break; }
+  if (p.ground && !p.onMover) for (const xx of [p.x + 1, p.x + p.w - 1]) { // plataformas que se derrumban
+    const tx = Math.floor(xx / T), ty = Math.floor((p.y + p.h + 2) / T), k = tx + "," + ty;
+    if (map[ty]?.[tx] === "F" && !(k in crumble)) { crumble[k] = 28; beep(180, .1, "square", 120); }
+  }
+  for (const k in crumble) if (--crumble[k] <= 0) {
+    const [tx, ty] = k.split(",").map(Number); map[ty][tx] = " "; delete crumble[k];
+    falling.push({ x: tx * T, y: ty * T, vy: 0 }); regrow.push({ tx, ty, t: 300 }); burst(tx * T + 8, ty * T + 8, TH.plat[0], 6);
+  }
+  for (const f of falling) { f.vy += .3; f.y += f.vy; }
+  falling = falling.filter((f) => f.y < H + 20);
+  for (const r of regrow) if (--r.t <= 0 && !hit(p, { x: r.tx * T, y: r.ty * T, w: T, h: T })) map[r.ty][r.tx] = "F";
+  regrow = regrow.filter((r) => r.t > 0 || map[r.ty][r.tx] !== "F");
   if (p.ground && !p.wasG && vyb > 2.5) burst(p.x + 5, p.y + 14, "#9a8a7a", 6); // polvo al caer
   if (p.ground && Math.abs(p.vx) > 1.5 && time % 9 === 0) burst(p.x + 5, p.y + 14, "#6a5a4a", 1);
   p.wasG = p.ground;
@@ -739,6 +765,9 @@ function drawTiles() {
       R(px, py, T, T, "#9a5a10"); R(px + 1, py + 1, T - 2, T - 2, shine ? "#ffe07a" : "#f2b632"); R(px + 1, py + 1, T - 2, 1, "#ffe9a8"); R(px + 1, py + T - 2, T - 2, 1, "#c27a10");
       for (const [a, b] of [[2, 2], [13, 2], [2, 13], [13, 13]]) R(px + a, py + b, 1, 1, "#9a5a10");
       R(px + 6, py + 3, 5, 2, "#6a3a00"); R(px + 9, py + 5, 2, 2, "#6a3a00"); R(px + 7, py + 7, 2, 2, "#6a3a00"); R(px + 7, py + 11, 2, 2, "#6a3a00");
+    } else if (c === "F") { // plataforma que se derrumba: rajada, y tiembla antes de caer
+      const j = crumble[x + "," + y] ? Math.round(Math.sin(time * 1.7 + x) * 1.5) : 0;
+      drawPlat(px + j, py, x, y, r); R(px + j + 4, py + 2, 1, 5, "#00000088"); R(px + j + 5, py + 6, 1, 4, "#00000088"); R(px + j + 11, py + 4, 1, 6, "#00000088");
     } else if (c === "u") { R(px, py, T, T, "#4a3c30"); R(px + 1, py + 1, T - 2, T - 2, "#6b5a45"); R(px + 1, py + 1, T - 2, 1, "#8a7860"); }
     else if (c === "~") {
       const [l1, l2] = TH.liquid;
@@ -885,6 +914,15 @@ function drawPlayer() {
   if (x2) { P(1, 6, 10, 1, "#1f7a7a"); P(7, 6, 1, 1, "#c07a6a"); } P(7, 5, 2, 1, big ? "#fff" : "#c08a70");
   if (big) g.restore();
 }
+function drawWater() { // el agua se dibuja encima del personaje para que se vea sumergido
+  const ox = Math.floor(cam), x0 = Math.max(0, Math.floor(cam / T)), x1 = Math.min(COLS - 1, x0 + Math.ceil(W / T) + 1);
+  for (let y = 0; y < ROWS; y++) for (let x = x0; x <= x1; x++) if (map[y][x] === "W") {
+    const px = x * T - ox, py = y * T, top = map[y - 1]?.[x] !== "W";
+    g.globalAlpha = .45; R(px, py, T, T, "#2a6a8a"); g.globalAlpha = 1;
+    if (top) for (let k = 0; k < T; k += 2) R(px + k, py + Math.round(Math.sin(time * .08 + (x * T + k) * .25)), 2, 1, "#9ad7ff");
+    if ((time + x * 11 + y * 7) % 90 < 30) R(px + 5 + (x % 3) * 2, py + 12 - ((time + x * 11 + y * 7) % 90) * .3, 1, 1, "#cfefff");
+  }
+}
 function drawShield() {
   const p = player; if (!p.shield || p.dead) return;
   const cx = p.x + p.w / 2 - cam, cy = p.y + p.h / 2, r = Math.max(p.w, p.h) * .75 + 3 + Math.sin(time * .15);
@@ -960,9 +998,16 @@ function draw() {
   g.save();
   if (shake) g.translate(Math.round((Math.random() - .5) * 4), Math.round((Math.random() - .5) * 4));
   drawBg(); drawTiles(); drawItems();
+  for (const f of falling) drawPlat(f.x - cam, f.y, -9, 0, .3);
+  for (const m of movers) { // plataformas móviles
+    const x = Math.round(m.x - cam), y = Math.round(m.y), [p0, p1, p2] = TH.plat;
+    if (L.theme === "city" || L.theme === "lab") { R(x + 3, 30, 1, y - 30, "#5a5a66"); R(x + m.w - 4, 30, 1, y - 30, "#5a5a66"); }
+    if (L.theme === "lair") { for (let k = 30; k < y; k += 4) { R(x + 3, k, 1, 2, "#6a5a5a"); R(x + m.w - 4, k + 2, 1, 2, "#6a5a5a"); } }
+    R(x, y, m.w, m.h, p0); R(x, y, m.w, 2, p1); R(x, y + m.h - 2, m.w, 2, p2); for (let k = 4; k < m.w; k += 8) R(x + k, y + 3, 2, 2, p2);
+  }
   zombies.forEach((z, i) => drawZombie(z, z.idx ?? i));
   for (const s of shots) { const x = s.x - cam; g.globalAlpha = .3; g.fillStyle = s.col; g.beginPath(); g.arc(x, s.y, s.r + 3, 0, 7); g.fill(); g.globalAlpha = 1; g.beginPath(); g.arc(x, s.y, s.r, 0, 7); g.fill(); R(x - 1, s.y - 2, 1, 1, "#f0ffc0"); }
-  drawPlayer(); drawShield(); drawBeam();
+  drawPlayer(); drawShield(); drawBeam(); drawWater();
   for (const q of parts) { g.globalAlpha = Math.min(1, q.life / 20); R(q.x - cam, q.y, 2, 2, q.col); } g.globalAlpha = 1;
   g.fillStyle = grads().vig; g.fillRect(0, 0, W, H);
   hud(); g.restore();
