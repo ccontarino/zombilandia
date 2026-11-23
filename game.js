@@ -1,7 +1,7 @@
 "use strict";
 // Zombilandia: platformer de zombies en canvas, sin librerías. Personajes y arte propios (rects de píxel).
 // 5 niveles: cementerio, ciudad en ruinas, pantano tóxico, laboratorio y la guarida del Rey Zombi (jefe final).
-const VERSION = "v51"; // subir en cada publicación (también en index.html)
+const VERSION = "v52"; // subir en cada publicación (también en index.html)
 // ---------- Métricas de uso (Umami, anónimas, sin cookies) ----------
 // Pegá acá el "Website ID" de tu sitio en Umami; vacío = no se manda nada. Respeta "No rastrear" del navegador y solo cuenta en el sitio publicado.
 const UMAMI = { id: "4c40559c-a7e6-4a1f-8fb1-6d289f3ffbcb", src: "https://cloud.umami.is/script.js", domains: "ccontarino.github.io" };
@@ -130,7 +130,7 @@ LEVELS.push(
     const T = [[0, 14, 13], [15, 22, 12], [23, 29, 11], [30, 36, 10], [37, 43, 9], [44, 51, 8], [56, 62, 9], [63, 68, 10], [69, 74, 11], [75, 79, 12], [84, 92, 12], [93, 97, 11], [98, 102, 10], [103, 108, 9], [109, 114, 8], [119, 125, 9], [126, 131, 10], [132, 137, 11], [138, 143, 12], [148, 156, 12], [157, 160, 11], [161, 164, 10], [165, 168, 11], [169, 172, 12], [173, 214, 13]];
     land(T); gaps(T);
     plat(45, 5, 3, "?"); coins(45, 4, 3); plat(100, 7, 3, "?"); plat(150, 9, 3, "?"); plat(33, 7, 3); coins(33, 6, 3); plat(58, 6, 3); coins(58, 5, 3); plat(111, 5, 3); coins(111, 4, 3); plat(128, 7, 3); coins(128, 6, 3);
-    set(46, 5, "S"); set(101, 7, "O"); set(151, 9, "S"); set(66, 9, "x"); set(135, 10, "x"); set(160, 10, "x");
+    set(46, 5, "S"); set(101, 7, "O"); set(151, 9, "S");
     return { arena: { wall: 188, lock: 192 }, movers: [], goal: 211, spawns: S("205G 8w 12r 18w 26j 33w 40r 47w 49k 58j 61w 66r 72w 77r 86w 90r 95k 100j 106w 111r 122j 128w 134r 140k 150w 154r 159w 163j 167r 176w 180r 20v 55v 105v 140v 70s 124s 38e 100e") };
   } },
   { name: "Desierto de huesos", theme: "desert", hard: true, build() { // dunas, arenas movedizas y dos pirámides escalonadas
@@ -139,7 +139,6 @@ LEVELS.push(
     const pyr = (c0, c1, top) => { for (let x = c0; x <= c1; x++) { const k = Math.min(x - c0, c1 - x), h = Math.min(13 - top, 1 + Math.floor(k / 2)); fill(x, x, 13 - h, 13, "#"); } };
     pyr(66, 90, 6); pyr(124, 146, 7);
     for (const [a, b] of [[28, 31], [52, 55], [104, 107], [112, 115], [152, 155], [168, 171]]) { fill(a, b, 13, 14, "~"); fill(a, b, 12, 12, " "); }
-    for (const c of [40, 46, 96, 120, 160]) set(c, surface(c) - 1, "x");
     plat(14, 9, 3, "?"); coins(14, 8, 3); plat(34, 8, 4); coins(34, 7, 4); plat(58, 8, 3); coins(58, 7, 3); plat(78, 3, 4, "?"); coins(78, 2, 4); plat(98, 9, 3, "?"); plat(108, 9, 3); coins(108, 8, 3); plat(136, 3, 4); coins(136, 2, 4); plat(156, 8, 3, "?"); plat(163, 7, 3); coins(163, 6, 3);
     set(15, 9, "S"); set(99, 9, "O"); set(157, 8, "S");
     return { arena: { wall: 188, lock: 192 }, movers: [], goal: 211, spawns: S("205F 10w 17r 24j 35w 46r 50k 60w 63j 70r 80w 88r 95j 108w 112k 125r 130w 136j 144r 158w 164k 175r 180w 20v 56v 92v 148v 40s 116s 84e 160e") };
