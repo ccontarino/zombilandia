@@ -2,7 +2,7 @@
 // Partida online entre dos aparatos. Un relé simple (relay/, en Cloudflare) junta a los dos y le pasa a cada uno lo que manda el otro.
 // El anfitrión corre TODO el juego y manda el estado unas 20 veces por segundo; el invitado manda sus botones y dibuja lo que le llega.
 // Comparte las variables de game.js (mode, players, zombies, map...), que se carga antes.
-const DEFAULT_RELAY = ""; // dirección del relé, por ejemplo "wss://zombilandia-relay.TU-USUARIO.workers.dev"
+const DEFAULT_RELAY = "wss://zombilandia.ccontarino.workers.dev"; // dirección del relé, por ejemplo "wss://zombilandia-relay.TU-USUARIO.workers.dev"
 (() => {
   const qp = new URLSearchParams(location.search), RELAY = qp.get("relay") || DEFAULT_RELAY;
   const $ = (id) => document.getElementById(id), ABC = "ABCDEFGHJKMNPQRSTUVWXYZ23456789";
