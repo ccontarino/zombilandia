@@ -1,7 +1,7 @@
 "use strict";
 // Zombilandia: platformer de zombies en canvas, sin librerías. Personajes y arte propios (rects de píxel).
 // 5 niveles: cementerio, ciudad en ruinas, pantano tóxico, laboratorio y la guarida del Rey Zombi (jefe final).
-const VERSION = "v47"; // subir en cada publicación (también en index.html)
+const VERSION = "v48"; // subir en cada publicación (también en index.html)
 const T = 16, H = 240, ROWS = 15, COLS = 215;
 let W = 480, cache = {};
 const cv = document.getElementById("c"); let g = cv.getContext("2d"); const MAINCTX = g; let SC = 1;
@@ -107,18 +107,63 @@ let players = [], pi = 0, K = keys, TP = tap, nPlayers = 1;
 const net = { role: null, peer: false, paused: false, rec: null, quiet: false, step() {}, press() { return false; } }; // lo completa net.js
 const me = () => (net.role === "guest" ? 1 : 0);
 const ctx = (i) => { pi = i; player = players[i]; K = inputs[i]; TP = taps[i]; }; // "player" es el jugador que se está procesando
-// Niveles 6-10: los mismos mundos, más difíciles (más zombis, jefe distinto, zombis un poco más veloces)
-(() => {
-  const base = LEVELS.slice(), bosses = ["fireman", "toad", "doctor", "digger", "boss"];
-  const names = ["Cementerio maldito", "Ciudad en llamas", "Pantano nocturno", "Laboratorio secreto", "El regreso del Rey"];
-  const extra = ["24w 50r 82j 120r 143k 168r 31v 95v 150v", "28r 60w 90b 125k 152r 175w 40v 110v", "30j 56r 80j 114k 140r 162w 55s 100s", "36r 54b 84r 120k 156b 177r 62e 130e", "34w 46r 66j 96b 110k 140b 150r 70v 120s"];
-  base.forEach((b, i) => LEVELS.push({ name: names[i], theme: b.theme, boss: b.boss, hard: true, build() {
-    const info = b.build(), bi = info.spawns.findIndex(([, t]) => ZT[t] && ZT[t].boss);
-    if (bi >= 0) info.spawns[bi] = [info.spawns[bi][0], bosses[i]];
-    info.spawns = info.spawns.concat(S(extra[i]));
-    return info;
-  } }));
-})();
+// Niveles 6-10: mapas propios, más difíciles (más zombis, jefes distintos, zombis un poco más veloces)
+LEVELS.push(
+  { name: "Cementerio maldito", theme: "cemetery", hard: true, build() {
+    fill(0, COLS - 1, 13, 14, "#");
+    for (const [a, b] of [[22, 25], [48, 51], [76, 79], [104, 107], [132, 135], [158, 161]]) { fill(a, b, 13, 14, " "); arc(a - 1, 11, b - a + 3); }
+    fill(34, 38, 11, 12, "#"); fill(62, 64, 11, 12, "#"); fill(65, 66, 10, 12, "#"); fill(90, 94, 11, 12, "#"); fill(116, 119, 12, 12, "#"); fill(144, 147, 11, 12, "#");
+    fill(44, 45, 12, 12, "x"); fill(112, 114, 12, 12, "x"); set(70, 12, "x"); set(128, 12, "x"); set(152, 12, "x");
+    plat(14, 9, 4); coins(14, 8, 4); plat(28, 9, 3, "?"); plat(42, 8, 4); coins(42, 7, 4); plat(56, 9, 3); plat(70, 8, 4); coins(70, 7, 4); plat(84, 8, 3, "?");
+    plat(98, 9, 4); coins(98, 8, 4); plat(120, 8, 4); coins(120, 7, 4); plat(124, 10, 2); plat(138, 9, 3, "?"); plat(150, 8, 4); coins(150, 7, 4); plat(166, 9, 3); plat(170, 7, 3); coins(170, 6, 3);
+    set(29, 9, "S"); set(85, 8, "O"); set(139, 9, "S");
+    return { arena: { wall: 188, lock: 192 }, movers: [[104, 10, 2, 3, 0, .02]], goal: 211, spawns: S("205F 20w 30w 36k 44r 54w 60r 68j 72w 80r 86w 92j 96k 100w 110r 116w 126j 130r 138w 148r 156w 164r 168j 172w 24v 66v 98v 142v 160s 90s 40e 122e") };
+  } },
+  { name: "Ciudad en llamas", theme: "city", hard: true, build() {
+    const B = [[0, 11, 13], [14, 22, 11], [25, 31, 10], [35, 42, 12], [45, 50, 10], [54, 62, 8], [65, 70, 10], [74, 82, 11], [86, 91, 9], [95, 103, 12], [106, 111, 10], [115, 120, 8], [124, 133, 11], [137, 142, 9], [146, 152, 12], [156, 161, 10], [165, 171, 8], [175, 214, 12]];
+    for (const [a, b, t] of B) fill(a, b, t, 14, "#");
+    for (let i = 0; i < B.length - 1; i++) { const [, b1, t1] = B[i], [a2, , t2] = B[i + 1]; arc(b1, Math.min(t1, t2) - 2, a2 - b1 + 1); }
+    set(48, 9, "^"); set(98, 11, "^"); set(158, 9, "^"); set(28, 9, "^");
+    plat(18, 8, 3, "?"); plat(56, 5, 3); coins(56, 4, 3); plat(100, 8, 3, "?"); plat(130, 7, 3); coins(130, 6, 3); plat(150, 9, 2); plat(168, 5, 4); coins(168, 4, 4); plat(78, 7, 3); coins(78, 6, 3);
+    set(19, 8, "S"); set(101, 8, "O");
+    return { arena: { wall: 188, lock: 192 }, movers: [[112, 9, 2, 4, 0, .02]], goal: 211, spawns: S("205T 16w 20r 27j 38w 40r 47k 56w 58r 67w 76r 80j 88w 93k 98r 108w 117r 128j 138w 144r 148k 158w 168r 178w 182r 30v 70v 118v 150v 100s 60e 130e") };
+  } },
+  { name: "Pantano nocturno", theme: "swamp", hard: true, build() {
+    fill(0, COLS - 1, 13, 14, "#");
+    for (const [a, b] of [[12, 16], [30, 34], [46, 52], [64, 67], [82, 90], [138, 141], [156, 162], [174, 177]]) {
+      fill(a, b, 13, 14, "~"); const n = b - a + 1;
+      if (n > 5) { const m = a + Math.floor(n / 2) - 1; plat(m, 11, 2); coins(m, 10, 2); } else arc(a - 1, 11, n + 2);
+    }
+    fill(22, 25, 12, 12, "#"); fill(58, 61, 11, 12, "#"); fill(94, 97, 12, 12, "#"); fill(130, 133, 11, 12, "#"); fill(148, 151, 12, 12, "#"); fill(166, 169, 12, 12, "#");
+    fill(116, 124, 11, 13, "W"); fill(116, 124, 14, 14, "#"); fill(114, 115, 11, 12, "#"); fill(125, 126, 11, 12, "#"); // laguna
+    plat(8, 9, 3); coins(8, 8, 3); plat(26, 9, 4, "?"); plat(40, 8, 3); coins(40, 7, 3); plat(70, 9, 3); coins(70, 8, 3); plat(100, 8, 3, "?"); plat(104, 10, 3); plat(142, 8, 4); coins(142, 7, 4); plat(172, 9, 3, "?");
+    set(27, 9, "S"); set(101, 8, "O"); set(173, 9, "S");
+    return { arena: { wall: 188, lock: 192 }, movers: [[138, 10, 2, 3, 0, .02]], goal: 211, spawns: S("205X 9w 20j 28w 38j 44r 56j 62w 74j 80r 94j 98w 106j 112w 128j 134r 144j 152w 168j 170r 180w 36s 76s 108s 146s 90v 130v 62e 152k 100k") };
+  } },
+  { name: "Laboratorio secreto", theme: "lab", hard: true, build() {
+    fill(0, COLS - 1, 0, 1, "#"); fill(0, COLS - 1, 13, 14, "#");
+    for (const [a, b] of [[28, 32], [64, 69], [104, 108], [142, 147]]) fill(a, b, 13, 14, "~");
+    for (const [a, b] of [[16, 18], [48, 51], [84, 87], [122, 125], [160, 162]]) { fill(a, b, 12, 12, "x"); arc(a - 1, 9, b - a + 3); }
+    fill(38, 39, 2, 9, "#"); fill(76, 77, 2, 8, "#"); fill(112, 113, 2, 9, "#"); fill(152, 153, 2, 8, "#");
+    fill(56, 57, 11, 12, "#"); fill(94, 95, 11, 12, "#"); fill(96, 97, 10, 12, "#"); fill(132, 133, 11, 12, "#"); fill(170, 171, 11, 12, "#");
+    plat(10, 9, 3, "?"); plat(23, 9, 3); coins(23, 8, 3); plat(44, 8, 4, "F"); coins(44, 7, 4); plat(70, 8, 3); coins(70, 7, 3); plat(88, 9, 3, "?"); plat(130, 8, 4); coins(130, 7, 4); plat(166, 9, 3, "?");
+    set(11, 9, "S"); set(89, 9, "O"); set(167, 9, "S");
+    return { arena: { wall: 188, lock: 192 }, movers: [[64, 11, 2, 3, 0, .02], [136, 10, 2, 0, 3, .025]], goal: 211, spawns: S("205G 12w 24r 36b 42w 52r 60b 72w 80r 90b 100r 110w 118b 128r 136w 148b 156r 164w 174b 180r 20e 66k 92e 132v 150k 174v") };
+  } },
+  { name: "El regreso del Rey", theme: "lair", boss: true, hard: true, build() {
+    fill(0, COLS - 1, 13, 14, "#");
+    for (const [a, b] of [[14, 18], [30, 35], [48, 52], [64, 70], [84, 89], [102, 108], [120, 124], [136, 141]]) {
+      fill(a, b, 13, 14, "~"); const n = b - a + 1;
+      if (n > 5) { const m = a + Math.floor(n / 2) - 1; plat(m, 10, 2); coins(m, 9, 2); } else arc(a - 1, 11, n + 2);
+    }
+    for (const [a, b] of [[40, 42], [58, 60], [112, 114], [128, 130]]) fill(a, b, 12, 12, "x");
+    fill(76, 77, 11, 12, "#"); fill(78, 79, 10, 12, "#"); fill(94, 95, 11, 12, "#"); fill(96, 97, 10, 12, "#"); set(72, 12, "^"); set(146, 12, "^");
+    plat(22, 9, 4, "F"); coins(22, 8, 4); plat(44, 9, 3, "?"); plat(80, 7, 4); coins(80, 6, 4); plat(100, 9, 3, "?"); plat(116, 6, 3); coins(116, 5, 3); plat(132, 8, 4, "F"); coins(132, 7, 4);
+    plat(165, 9, 3); plat(174, 9, 3, "?");
+    set(45, 9, "S"); set(175, 9, "S"); set(101, 9, "O");
+    return { arena: { wall: 155, lock: 161 }, movers: [[84, 10, 2, 5, 0, .02], [102, 10, 2, 5, 0, .018], [136, 9, 2, 4, 0, .022]], goal: 186, spawns: S("10w 20r 26j 40b 46r 56j 62w 74r 78b 92j 98r 112r 116j 126b 132r 146j 150b 152r 178B 54v 100v 118s 144e 134k 66k 24v") };
+  } }
+);
 const NL = LEVELS.length; // el modo infinito es el casillero NL; los niveles propios usan NL+1
 const ZT = {
   walker: { w: 12, h: 14, hp: 1, speed: .4, pts: 100 },
