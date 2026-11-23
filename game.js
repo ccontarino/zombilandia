@@ -1,7 +1,7 @@
 "use strict";
 // Zombilandia: platformer de zombies en canvas, sin librerías. Personajes y arte propios (rects de píxel).
 // 5 niveles: cementerio, ciudad en ruinas, pantano tóxico, laboratorio y la guarida del Rey Zombi (jefe final).
-const VERSION = "v36"; // subir en cada publicación (también en index.html)
+const VERSION = "v39"; // subir en cada publicación (también en index.html)
 const T = 16, H = 240, ROWS = 15, COLS = 215;
 let W = 480, cache = {};
 const cv = document.getElementById("c"); let g = cv.getContext("2d"); const MAINCTX = g; let SC = 1;
@@ -604,8 +604,10 @@ function movePlayer(p0) { // movimiento puro del jugador (ctx ya fijó K y TP); 
 }
 function stepPlayer(i) {
   ctx(i);
-  const p = player;
+  const p = player, wasG = p.ground, pvy = p.vy;
   movePlayer(p);
+  if (p.ground && !wasG && pvy > 2.2) burst(p.x + p.w / 2, p.y + p.h, "#c8b8a0", 6 + Math.min(8, pvy | 0), 1.6); // polvo al aterrizar
+  else if (p.ground && Math.abs(p.vx) > 1.6 && time % 7 === 0) burst(p.x + p.w / 2 - p.face * 4, p.y + p.h, "#b8a890", 2, .8);
   // rayo láser de ojos: se dispara al apretar, con recarga
   if (p.cd > 0) p.cd--;
   if ((TP.fire || K.fire && !p.firePrev) && p.cd <= 0) {
@@ -857,23 +859,16 @@ function drawBg() {
   if (TH.ambient) AMB[TH.ambient]();
 }
 function drawDeco(x, y, k) {
-  if (k === "tomb") { R(x + 3, y + 4, 10, 12, "#5d5870"); R(x + 4, y + 2, 8, 2, "#5d5870"); R(x + 5, y + 1, 6, 1, "#5d5870"); R(x + 3, y + 4, 1, 12, "#7a7590"); R(x + 6, y + 6, 4, 1, "#3e3a50"); R(x + 6, y + 8, 4, 1, "#3e3a50"); R(x + 4, y + 13, 3, 2, "#4f7a3a"); }
-  else if (k === "cross") { R(x + 7, y + 3, 2, 13, "#4a3a2a"); R(x + 4, y + 6, 8, 2, "#4a3a2a"); R(x + 7, y + 3, 1, 13, "#6a5440"); }
-  else if (k === "bones") { R(x + 3, y + 14, 8, 2, "#d8d0c0"); R(x + 2, y + 13, 2, 1, "#d8d0c0"); R(x + 10, y + 13, 2, 1, "#d8d0c0"); R(x + 9, y + 10, 5, 4, "#e8e0d0"); R(x + 10, y + 11, 1, 1, "#222"); R(x + 12, y + 11, 1, 1, "#222"); }
-  else if (k === "cone") { R(x + 3, y + 15, 10, 1, "#c05a10"); R(x + 7, y + 6, 2, 3, "#ff7a1a"); R(x + 6, y + 9, 4, 3, "#ff7a1a"); R(x + 5, y + 12, 6, 3, "#ff7a1a"); R(x + 6, y + 10, 4, 1, "#f0f0f0"); }
-  else if (k === "barrel") { const c = TH === THEMES.lab ? "#d8b020" : "#2a6a8a"; R(x + 3, y + 5, 10, 11, c); R(x + 3, y + 5, 2, 11, "#ffffff22"); R(x + 3, y + 7, 10, 1, "#00000055"); R(x + 3, y + 13, 10, 1, "#00000055"); if (c === "#d8b020") { R(x + 7, y + 9, 2, 2, "#1a1a1a"); R(x + 5, y + 10, 1, 1, "#1a1a1a"); R(x + 10, y + 10, 1, 1, "#1a1a1a"); } }
-  else if (k === "rubble") { R(x + 2, y + 12, 12, 4, "#4a4a52"); R(x + 4, y + 10, 6, 2, "#5e5e68"); R(x + 9, y + 11, 3, 1, "#7a7a84"); R(x + 11, y + 9, 1, 3, "#8a5030"); }
-  else if (k === "sign") { R(x + 7, y + 6, 1, 10, "#5a5a62"); R(x + 3, y + 1, 9, 6, "#d0a020"); R(x + 5, y + 3, 5, 1, "#2a2a2a"); R(x + 7, y + 4, 1, 1, "#2a2a2a"); }
-  else if (k === "mushroom") { g.globalAlpha = .18 + Math.sin(time * .05 + x) * .08; R(x + 1, y + 5, 12, 9, "#c07aff"); g.globalAlpha = 1; R(x + 6, y + 11, 2, 5, "#d8d0b0"); R(x + 3, y + 8, 8, 3, "#9a3ac8"); R(x + 4, y + 7, 6, 1, "#9a3ac8"); R(x + 5, y + 9, 1, 1, "#e8c0ff"); R(x + 8, y + 8, 1, 1, "#e8c0ff"); }
-  else if (k === "reeds") { R(x + 4, y + 4, 1, 12, "#4a7a2a"); R(x + 3, y + 4, 3, 4, "#6a4a2a"); R(x + 9, y + 7, 1, 9, "#3f6a2a"); R(x + 8, y + 7, 3, 3, "#6a4a2a"); R(x + 12, y + 10, 1, 6, "#4a7a2a"); }
-  else if (k === "crate") { R(x + 2, y + 6, 12, 10, "#7a5a3a"); R(x + 2, y + 6, 12, 1, "#9a7a4a"); for (let i = 0; i < 9; i++) { R(x + 3 + i, y + 7 + i, 1, 1, "#4a3420"); R(x + 12 - i, y + 7 + i, 1, 1, "#4a3420"); } }
-  else if (k === "tank") { R(x + 4, y + 5, 8, 11, "#3a6a5a"); R(x + 5, y + 3, 6, 2, "#5a6676"); g.globalAlpha = .6 + Math.sin(time * .1 + x) * .3; R(x + 6, y + 8, 4, 5, "#c6ff3a"); g.globalAlpha = 1; }
-  else if (k === "skull") { R(x + 5, y + 10, 6, 4, "#e8e0d0"); R(x + 6, y + 14, 4, 2, "#e8e0d0"); R(x + 6, y + 11, 1, 2, "#222"); R(x + 9, y + 11, 1, 2, "#222"); R(x + 7, y + 15, 1, 1, "#222"); }
-  else if (k === "torch") {
-    const fl = Math.sin(time * .4 + x) > 0; g.globalAlpha = .16; R(x + 1, y - 4, 14, 14, "#ff8a1a"); g.globalAlpha = 1;
-    R(x + 7, y + 6, 2, 10, "#4a3020"); R(x + 6, y + 5, 4, 2, "#6a4a30"); R(x + 6, y + 1 + (fl ? 1 : 0), 4, 4, "#ff8a1a"); R(x + 7, y + (fl ? 0 : 1), 2, 3, "#ffe060");
-  }
-  else { R(x + 4, y + 12, 1, 4, "#3f6a2a"); R(x + 6, y + 10, 1, 6, "#4f8a35"); R(x + 8, y + 13, 1, 3, "#3f6a2a"); R(x + 10, y + 11, 1, 5, "#4f8a35"); }
+  const c = tex("d" + k, T, T + 4, (cx) => { cx.translate(0, 4); decoArt(cx, k, T, L.theme); });
+  g.drawImage(c, x, y - 4, T, T + 4);
+  if (k === "torch") { // llama animada con resplandor
+    const fl = Math.sin(time * .4 + x) * .5, cx = x + 8, cy = y + 3;
+    glow(cx, cy, 20, "#ff8a1a", .4 + fl * .12);
+    g.save(); g.translate(cx, cy + 3);
+    g.beginPath(); g.moveTo(-2.6, 0); g.quadraticCurveTo(-3.2, -3.6 - fl, 0, -7 - fl * 2); g.quadraticCurveTo(3.2, -3.6, 2.6, 0); g.closePath(); g.fillStyle = vgrad(g, -7, 0, [[0, "#ffd060"], [1, "#ff6a10"]]); g.fill();
+    g.beginPath(); g.moveTo(-1.2, 0); g.quadraticCurveTo(-1.4, -2, 0, -4 - fl); g.quadraticCurveTo(1.4, -2, 1.2, 0); g.closePath(); g.fillStyle = "#fff0b0"; g.fill(); g.restore();
+  } else if (k === "mushroom") glow(x + 8, y + 8, 14, "#c07aff", .25 + Math.sin(time * .05 + x) * .1);
+  else if (k === "tank") { glow(x + 8, y + 10, 12, "#c6ff3a", .22 + Math.sin(time * .1 + x) * .08); const bt = (time + x * 3) % 50; g.globalAlpha = .7; R(x + 7 + (x % 3), y + 14 - bt * .2, 1, 1, "#e8ffa0"); g.globalAlpha = 1; }
 }
 function drawGroundOld(px, py, x, y, r) {
   const [g1, g2, g3] = TH.grass, [d1, d2, d3, d4] = TH.dirt, top = map[y - 1]?.[x] !== "#", bottom = map[y + 1]?.[x] !== "#" && y < ROWS - 1;
@@ -941,6 +936,21 @@ function drawPlat(px, py, x, y, r) {
   g.drawImage(c, px, py, T, T);
 }
 function drawQuestion(px, py, shine) { g.drawImage(tex("q" + (+shine), T, T, (x) => questionArt(x, T, shine)), px, py, T, T); }
+function drawLiquid(px, py, x, y, r) {
+  const [l1, l2] = TH.liquid, lava = L.theme === "lair", top = map[y - 1]?.[x] !== "~";
+  if (top) {
+    const wv = (xx) => Math.sin(time * (lava ? .05 : .09) + (x * T + xx) * .22) * 1.3 + Math.sin(time * .04 + (x * T + xx) * .11) * .8;
+    g.beginPath(); g.moveTo(px, py + 20); g.lineTo(px, py + 3 + wv(0)); for (let k = 2; k <= T; k += 2) g.lineTo(px + k, py + 3 + wv(k)); g.lineTo(px + T, py + 20); g.closePath();
+    g.fillStyle = vgrad(g, py + 2, py + 18, [[0, lerpHex(l1, "#ffffff", lava ? .1 : .25)], [.25, l1], [1, l2]]); g.fill();
+    g.beginPath(); for (let k = 0; k <= T; k += 2) { const yy = py + 3 + wv(k); k ? g.lineTo(px + k, yy) : g.moveTo(px, yy); } g.strokeStyle = lava ? "rgba(255,240,160,.9)" : "rgba(255,255,255,.7)"; g.lineWidth = .8; g.stroke();
+    if (lava) glow(px + 8, py + 1, 20, "#ff7a20", .35 + Math.sin(time * .06 + x) * .1);
+    else { g.globalAlpha = .3; g.fillStyle = l1; g.fillRect(px, py - 2, T, 4); g.globalAlpha = 1; }
+    const bt = (time + x * 13) % 70; if (bt < 30) { g.globalAlpha = .85 - bt / 40; g.beginPath(); g.arc(px + 4 + (x % 3) * 4, py + 14 - bt * .35, 1 + (bt % 5) * .08, 0, 7); g.strokeStyle = lava ? "#fff0a0" : "#e8fbff"; g.lineWidth = .5; g.stroke(); g.globalAlpha = 1; }
+  } else {
+    g.fillStyle = vgrad(g, py, py + T, [[0, l2], [1, lerpHex(l2, "#000000", .3)]]); g.fillRect(px, py, T + .5, T + .5);
+    g.strokeStyle = lava ? "rgba(255,210,90,.45)" : "rgba(255,255,255,.12)"; g.lineWidth = .6; g.beginPath(); const o = (r * 6) | 0; g.moveTo(px + 1, py + 5 + o); g.quadraticCurveTo(px + 6, py + 3 + o, px + 12, py + 6 + o); g.stroke();
+  }
+}
 function drawTiles() {
   const ox = Math.floor(cam), x0 = Math.max(0, Math.floor(cam / T)), x1 = Math.min(COLS - 1, x0 + Math.ceil(W / T) + 1);
   for (const [x, y, k] of deco) if (x >= x0 - 1 && x <= x1) drawDeco(x * T - ox, y * T, k);
@@ -956,14 +966,8 @@ function drawTiles() {
       const j = crumble[x + "," + y] ? Math.round(Math.sin(time * 1.7 + x) * 1.5) : 0;
       drawPlat(px + j, py, x, y, r); R(px + j + 4, py + 2, 1, 5, "#00000088"); R(px + j + 5, py + 6, 1, 4, "#00000088"); R(px + j + 11, py + 4, 1, 6, "#00000088");
     } else if (c === "u") g.drawImage(tex("u", T, T, (x) => { rrect(x, .5, .5, T - 1, T - 1, 2.5); x.fillStyle = "#2c2218"; x.fill(); rrect(x, 1.2, 1.2, T - 2.4, T - 2.4, 2); const gr = x.createLinearGradient(0, 0, 0, T); gr.addColorStop(0, "#8a7860"); gr.addColorStop(.3, "#6b5a45"); gr.addColorStop(1, "#4a3c30"); x.fillStyle = gr; x.fill(); }), px, py, T, T);
-    else if (c === "~") {
-      const [l1, l2] = TH.liquid;
-      if (map[y - 1]?.[x] !== "~") {
-        g.globalAlpha = .22 + Math.sin(time * .08 + x) * .06; R(px, py - 6, T, 9, l1); g.globalAlpha = 1;
-        R(px, py + 4, T, 12, l2); for (let k = 0; k < T; k += 2) R(px + k, py + 3 + Math.round(Math.sin(time * .1 + (x * T + k) * .3)), 2, 2, l1);
-        const bt = (time + x * 13) % 60; if (bt < 24) R(px + 4 + (x % 3) * 3, py + 13 - bt * .4, 2, 2, l1);
-      } else { R(px, py, T, T, l2); R(px + (r * 12 | 0), py + 6, 2, 2, l1); }
-    } else if (c === "x") {
+    else if (c === "~") drawLiquid(px, py, x, y, r);
+    else if (c === "x") {
       R(px, py + 13, T, 3, "#3a3a44");
       for (let k = 0; k < 4; k++) { R(px + k * 4 + 1, py + 9, 2, 4, "#b8c0cc"); R(px + k * 4 + 1, py + 7, 1, 2, L.theme === "lair" ? "#ff6a4a" : "#e8eef5"); R(px + k * 4 + 2, py + 9, 1, 4, "#7a8290"); }
     } else if (c === "^") {
@@ -1094,6 +1098,12 @@ function drawDoctor(z, x, y, f, s) {
     g.restore();
   }
 }
+function drawGlass(z, x, y) {
+  if (!(z.glass > 0)) return;
+  g.save(); g.globalAlpha = .18 + z.glass * .06; g.fillStyle = "#bfefff"; g.fillRect(x - 5, y - 6, z.w + 10, z.h + 8); g.globalAlpha = .8; g.strokeStyle = "#e8faff"; g.lineWidth = 1; g.strokeRect(x - 4.5, y - 5.5, z.w + 9, z.h + 7);
+  if (z.glass < 3) { g.beginPath(); g.moveTo(x - 2, y); g.lineTo(x + 6, y + 9); g.lineTo(x + 3, y + 16); if (z.glass < 2) { g.moveTo(x + 20, y - 4); g.lineTo(x + 12, y + 6); } g.stroke(); }
+  g.restore();
+}
 function drawZombie(z, i) {
   const x = Math.round(z.x - cam), y = Math.round(z.y);
   if (x < -40 || x > W + 40) return;
@@ -1103,12 +1113,13 @@ function drawZombie(z, i) {
   }
   const f = z.vx > 0 ? 1 : -1, s = Math.sin(z.step * 4), bob = z.ground && s > 0 ? 1 : 0;
   if (z.flash && (z.flash >> 1) % 2) g.globalAlpha = .35;
-  if (z.type === "brute") drawBrute(z, x, y + bob, f, s);
-  else if (z.type === "boss") drawBoss(z, x, y + bob, f, s);
-  else if (z.type === "digger") drawDigger(z, x, y + bob, z.face || f, s);
-  else if (z.type === "fireman") drawFireman(z, x, y + bob, z.face || f, s);
-  else if (z.type === "toad") drawToad(z, x, y, f);
-  else if (z.type === "doctor") drawDoctor(z, x, y + bob, z.face || f, s);
+  const BIG = { brute: bruteArt, boss: bossArt, digger: diggerArt, fireman: firemanArt, toad: toadArt, doctor: doctorArt };
+  if (BIG[z.type]) {
+    const ff = ["digger", "fireman", "doctor"].includes(z.type) ? z.face || f : f;
+    g.save(); g.translate(x + z.w / 2, y + (z.type === "toad" ? 0 : bob)); g.scale(ff, 1); BIG[z.type](g, { s, t: time, tt: z.t, ground: z.ground }); g.restore();
+    if (z.type === "doctor") drawGlass(z, x, y + bob);
+    if (z.type === "brute" && z.hp < ZT.brute.hp) for (let k = 0; k < ZT.brute.hp; k++) R(x + 2 + k * 5, y - 5, 4, 2, k < z.hp ? "#ff5a5a" : "#3a2a2a");
+  }
   else if (z.type === "bat") { g.save(); g.translate(x + z.w / 2, y); batArt(g, { t: time, i }); g.restore(); }
   else { g.save(); g.translate(x + z.w / 2, y + bob); g.scale(f, 1); zombieArt(g, { type: z.type, s, t: time, i, ground: z.ground, tt: z.t, broken: z.broken }); g.restore(); }
   g.globalAlpha = 1;
@@ -1135,9 +1146,9 @@ function drawWater() { // el agua se dibuja encima del personaje para que se vea
   const ox = Math.floor(cam), x0 = Math.max(0, Math.floor(cam / T)), x1 = Math.min(COLS - 1, x0 + Math.ceil(W / T) + 1);
   for (let y = 0; y < ROWS; y++) for (let x = x0; x <= x1; x++) if (map[y][x] === "W") {
     const px = x * T - ox, py = y * T, top = map[y - 1]?.[x] !== "W";
-    g.globalAlpha = .45; R(px, py, T, T, "#2a6a8a"); g.globalAlpha = 1;
-    if (top) for (let k = 0; k < T; k += 2) R(px + k, py + Math.round(Math.sin(time * .08 + (x * T + k) * .25)), 2, 1, "#9ad7ff");
-    if ((time + x * 11 + y * 7) % 90 < 30) R(px + 5 + (x % 3) * 2, py + 12 - ((time + x * 11 + y * 7) % 90) * .3, 1, 1, "#cfefff");
+    g.fillStyle = vgrad(g, py, py + T, [[0, "rgba(60,150,190,.4)"], [1, "rgba(20,80,120,.55)"]]); g.fillRect(px, py, T + .5, T + .5);
+    if (top) { g.beginPath(); for (let k = 0; k <= T; k += 2) { const yy = py + Math.sin(time * .08 + (x * T + k) * .25) * 1.1; k ? g.lineTo(px + k, yy) : g.moveTo(px, yy); } g.strokeStyle = "rgba(190,235,255,.85)"; g.lineWidth = .9; g.stroke(); }
+    const bt = (time + x * 11 + y * 7) % 90; if (bt < 30) { g.globalAlpha = .8 - bt / 40; g.beginPath(); g.arc(px + 5 + (x % 3) * 3, py + 12 - bt * .3, 1, 0, 7); g.strokeStyle = "#cfefff"; g.lineWidth = .5; g.stroke(); g.globalAlpha = 1; }
   }
 }
 function drawShield(p) {
@@ -1195,7 +1206,8 @@ function hud() {
   }
 }
 function panel(title, sub, c) {
-  g.fillStyle = "rgba(7,5,26,.8)"; g.fillRect(0, 0, W, H);
+  g.fillStyle = "rgba(7,5,26,.72)"; g.fillRect(0, 0, W, H);
+  { const pw = Math.min(W - 24, 330), px = W / 2 - pw / 2; rr(px, 40, pw, 130 + Math.max(0, sub.length - 5) * 17, 10, "rgba(24,16,52,.6)"); g.strokeStyle = hexA(c.length === 7 ? c : "#7cc456", .55); g.lineWidth = 1; g.beginPath(); g.roundRect ? g.roundRect(px + .5, 40.5, pw - 1, 129 + Math.max(0, sub.length - 5) * 17, 10) : g.rect(px + .5, 40.5, pw - 1, 129); g.stroke(); glow(W / 2, 72, 90, c.length === 7 ? c : "#7cc456", .12); }
   g.textAlign = "center"; g.textBaseline = "alphabetic"; g.font = `bold ${title.length > 12 ? 22 : 30}px ui-monospace, monospace`;
   g.fillStyle = "#000"; g.fillText(title, W / 2 + 2, 76); g.shadowColor = c; g.shadowBlur = 14; g.fillStyle = c; g.fillText(title, W / 2, 74); g.shadowBlur = 0;
   g.fillStyle = "#f3efe6"; g.font = "11px ui-monospace, monospace";
@@ -1409,7 +1421,7 @@ function draw() {
     if (s.kind === "fire") { g.globalAlpha = .35; R(x - 4, s.y - 4, 8, 8, "#ff5a10"); g.globalAlpha = 1; R(x - 2, s.y - 2, 4, 4, s.col); R(x - 1, s.y - 1, 2, 2, "#fff0a0"); continue; }
     g.globalAlpha = .3; g.fillStyle = s.col; g.beginPath(); g.arc(x, s.y, s.r + 3, 0, 7); g.fill(); g.globalAlpha = 1; g.beginPath(); g.arc(x, s.y, s.r, 0, 7); g.fill(); R(x - 1, s.y - 2, 1, 1, "#f0ffc0"); }
   for (const q of players) { drawPlayer(q); drawShield(q); drawBeam(q); } drawWater();
-  for (const q of parts) { g.globalAlpha = Math.min(1, q.life / 20); R(q.x - cam, q.y, 2, 2, q.col); } g.globalAlpha = 1;
+  for (const q of parts) { const a = Math.min(1, q.life / 20); g.globalAlpha = a; g.fillStyle = q.col; g.beginPath(); g.arc(q.x - cam, q.y, 1 + a * .9, 0, 7); g.fill(); } g.globalAlpha = 1;
   drawLights(); postFX();
   g.fillStyle = grads().vig; g.fillRect(0, 0, W, H);
   hud(); g.restore();
