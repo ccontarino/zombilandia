@@ -6,6 +6,11 @@
 <meta name="theme-color" content="#14101f">
 <title>Zombilandia · platformer de zombies</title>
 <meta name="description" content="Saltá sobre los zombis, juntá cerebros y llegá a la bandera. Juego web de plataformas.">
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="theme-color" content="#14101f">
+<link rel="apple-touch-icon" href="icon-192.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect width='16' height='16' fill='%2314101f'/%3E%3Crect x='3' y='3' width='10' height='10' fill='%237fbf5a'/%3E%3Crect x='5' y='6' width='2' height='2' fill='%23fff'/%3E%3Crect x='9' y='6' width='2' height='2' fill='%23fff'/%3E%3Crect x='5' y='10' width='6' height='1' fill='%23222'/%3E%3C/svg%3E">
 <style>
   :root { --bg:#14101f; --ink:#f3efe6; --green:#7fbf5a; --red:#d6453d; }
@@ -98,9 +103,10 @@
   <input id="cfgCode" placeholder="Código de progreso (pegalo acá)" autocomplete="off">
   <div class="msg" id="cfgMsg"></div>
   <div class="acts"><button id="cfgMenu">Volver al menú</button><button id="cfgClose">Seguir</button></div></div></div>
-<script src="art.js?v=40"></script>
-<script src="chars.js?v=40"></script>
-<script src="game.js?v=40"></script>
-<script src="net.js?v=40"></script>
+<script src="art.js?v=41"></script>
+<script src="chars.js?v=41"></script>
+<script src="game.js?v=41"></script>
+<script src="net.js?v=41"></script>
+<script>if ("serviceWorker" in navigator && (location.protocol === "https:" || location.hostname === "localhost")) navigator.serviceWorker.register("sw.js?v=41").catch(() => {});</script>
 </body>
 </html>

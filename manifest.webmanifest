@@ -1,0 +1,15 @@
+{
+  "name": "Zombilandia",
+  "short_name": "Zombilandia",
+  "description": "Plataformas de zombis para jugar solo o con un amigo online.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "fullscreen",
+  "orientation": "landscape",
+  "background_color": "#14101f",
+  "theme_color": "#14101f",
+  "icons": [
+    { "src": "icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any maskable" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
+  ]
+}
