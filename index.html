@@ -18,19 +18,22 @@
   #pad button { width:76px; height:76px; border:2px solid #4a3e6b; background:#251d3d; color:var(--ink); font:700 28px/1 ui-monospace, monospace; border-radius:6px; touch-action:none; }
   #pad button.on { background:#3b2f60; transform:scale(.96); }
   @media (hover:hover) and (pointer:fine) { #pad { display:none; } canvas { max-width: calc((100vh - 24px) * 2); } }
+  #opts { position:absolute; top: calc(env(safe-area-inset-top) + 6px); right: 8px; display:flex; gap:6px; z-index:2; }
+  #opts button { width:34px; height:34px; border:1px solid #4a3e6b; background:#251d3dcc; color:var(--ink); font:700 16px/1 ui-monospace, monospace; border-radius:6px; }
   #hint { position:absolute; bottom:6px; font-size:12px; opacity:.55; display:none; }
   @media (hover:hover) and (pointer:fine) { #hint { display:block; } }
 </style>
 </head>
 <body>
 <div id="wrap">
+  <div id="opts"><button id="mus" aria-label="Música (M)" title="Música (M)">♪</button></div>
   <canvas id="c" width="480" height="240"></canvas>
   <div id="pad">
     <div class="grp"><button data-k="left" aria-label="Izquierda">◀</button><button data-k="right" aria-label="Derecha">▶</button></div>
     <div class="grp"><button data-k="fire" aria-label="Rayo láser">⚡</button><button data-k="jump" aria-label="Saltar">▲</button></div>
   </div>
-  <div id="hint">← → o A D para moverte · Espacio o ↑ para saltar (dos veces = doble salto) · X o F para el rayo</div>
+  <div id="hint">← → o A D para moverte · Espacio o ↑ para saltar (dos veces = doble salto) · X o F para el rayo · M música</div>
 </div>
-<script src="game.js?v=10"></script>
+<script src="game.js?v=11"></script>
 </body>
 </html>

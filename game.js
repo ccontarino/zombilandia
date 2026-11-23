@@ -1,7 +1,7 @@
 "use strict";
 // Zombilandia: platformer de zombies en canvas, sin librerías. Personajes y arte propios (rects de píxel).
 // 5 niveles: cementerio, ciudad en ruinas, pantano tóxico, laboratorio y la guarida del Rey Zombi (jefe final).
-const VERSION = "v10"; // subir en cada publicación (también en index.html)
+const VERSION = "v11"; // subir en cada publicación (también en index.html)
 const T = 16, H = 240, ROWS = 15, COLS = 190;
 let W = 480, cache = {};
 const cv = document.getElementById("c"), g = cv.getContext("2d");
@@ -189,6 +189,68 @@ let ac; const beep = (f, d, type = "square", f2, delay = 0) => {
     o.connect(v).connect(ac.destination); o.start(t0); o.stop(t0 + d);
   } catch {}
 };
+// ---------- Música ----------
+// Chiptune generada en el momento: cada canción sale de una escala y una semilla fija, así suena siempre igual.
+let musicOn = true; try { musicOn = localStorage.getItem("zombilandia-musica") !== "0"; } catch {}
+function audioInit() { try { ac ||= new (window.AudioContext || window.webkitAudioContext)(); if (ac.state === "suspended") ac.resume(); } catch {} }
+const SONG = (root, scale, bpm, lead, seed, boss) => ({ root, scale, bpm, lead, seed, boss });
+const SONGS = [
+  SONG(45, [0, 3, 5, 7, 10], 112, "square", 11),        // cementerio
+  SONG(43, [0, 2, 3, 7, 8], 128, "square", 23),         // ciudad en ruinas
+  SONG(41, [0, 3, 5, 6, 7, 10], 98, "triangle", 37),    // pantano
+  SONG(47, [0, 1, 5, 7, 8], 122, "square", 41),         // laboratorio
+  SONG(40, [0, 1, 4, 5, 7, 8, 10], 136, "sawtooth", 53), // guarida
+];
+const BOSS_SONG = SONG(38, [0, 1, 3, 6, 7], 152, "sawtooth", 67, true), TITLE_SONG = SONG(45, [0, 3, 5, 7, 10], 92, "triangle", 79);
+function compose(s) { // 4 compases de 16 pasos: un motivo que se repite sobre una progresión, más bajo y batería
+  const n = s.scale.length, prog = [0, 0, 3 % n, 4 % n], motif = [];
+  let d = 2;
+  for (let i = 0; i < 16; i++) { d = Math.max(0, Math.min(n + 2, d + [-1, 0, 1, 2, -2][Math.floor(rnd(s.seed * 31 + i) * 5)])); motif.push(rnd(s.seed * 7 + i) < (s.boss ? .75 : .6) || i === 0 ? d : null); }
+  const deg = (k) => s.scale[k % n] + 12 * Math.floor(k / n);
+  const steps = [];
+  for (let i = 0; i < 64; i++) {
+    const bar = i >> 4, st = i % 16, m = motif[st], alt = bar === 3 && st >= 8;
+    steps.push({
+      bass: st % 4 === 0 || (s.boss && st % 2 === 0) ? s.root - 12 + deg(prog[bar]) : null,
+      lead: m === null ? null : s.root + 12 + deg(m + prog[bar] + (alt ? 2 : 0)),
+      drum: st % 8 === 0 ? "k" : st % 8 === 4 ? "s" : (s.boss || st % 2 === 0) ? "h" : null,
+    });
+  }
+  return steps;
+}
+const hz = (n) => 440 * Math.pow(2, (n - 69) / 12);
+let mGain, noise, mSong = null, mStep = 0, mNext = 0;
+function tone(f, t, d, type, vol, f2) {
+  const o = ac.createOscillator(), v = ac.createGain(); o.type = type; o.frequency.setValueAtTime(f, t); if (f2) o.frequency.exponentialRampToValueAtTime(f2, t + d);
+  v.gain.setValueAtTime(vol, t); v.gain.exponentialRampToValueAtTime(0.0001, t + d); o.connect(v).connect(mGain); o.start(t); o.stop(t + d);
+}
+function noiseHit(t, d, vol, hp) {
+  const b = ac.createBufferSource(), v = ac.createGain(), f = ac.createBiquadFilter(); b.buffer = noise; f.type = "highpass"; f.frequency.value = hp;
+  v.gain.setValueAtTime(vol, t); v.gain.exponentialRampToValueAtTime(0.0001, t + d); b.connect(f).connect(v).connect(mGain); b.start(t); b.stop(t + d);
+}
+function musicTick() {
+  if (!ac || ac.state !== "running") return;
+  if (!mGain) {
+    mGain = ac.createGain(); mGain.gain.value = 1; mGain.connect(ac.destination);
+    noise = ac.createBuffer(1, ac.sampleRate * .3, ac.sampleRate); const d = noise.getChannelData(0); for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
+  }
+  const want = !musicOn || mode === "over" ? null : mode === "title" ? TITLE_SONG : L.boss && arenaLocked && !bossDead ? BOSS_SONG : SONGS[levelIdx % SONGS.length];
+  if (want !== mSong) { mSong = want; mStep = 0; mNext = ac.currentTime + .08; if (want) want.c ||= compose(want); }
+  if (!want) return;
+  const dt = 60 / want.bpm / 4;
+  if (mNext < ac.currentTime - .3) mNext = ac.currentTime + .05; // volvió de una pestaña oculta
+  while (mNext < ac.currentTime + .15) {
+    const s = want.c[mStep % 64], t = mNext;
+    if (s.bass !== null) tone(hz(s.bass), t, dt * 1.8, "triangle", .07);
+    if (s.lead !== null) tone(hz(s.lead), t, dt * .9, want.lead, want.lead === "sawtooth" ? .018 : .026);
+    if (s.drum === "k") tone(150, t, .12, "sine", .12, 40); else if (s.drum === "s") noiseHit(t, .1, .05, 1200); else if (s.drum === "h") noiseHit(t, .03, .02, 6000);
+    mStep++; mNext += dt;
+  }
+}
+function toggleMusic() {
+  musicOn = !musicOn; try { localStorage.setItem("zombilandia-musica", musicOn ? "1" : "0"); } catch {}
+  const b = document.getElementById("mus"); if (b) b.textContent = musicOn ? "♪" : "✕"; audioInit();
+}
 const fanfare = () => [523, 659, 784, 1047].forEach((f, i) => beep(f, .18, "triangle", 0, i * .12));
 
 // ---------- Lógica ----------
@@ -740,7 +802,7 @@ let last = performance.now(), acc = 0;
 function frame(now) {
   acc += Math.min(100, now - last); last = now;
   while (acc >= 1000 / 60) { update(); acc -= 1000 / 60; }
-  draw(); requestAnimationFrame(frame);
+  draw(); musicTick(); requestAnimationFrame(frame);
 }
 requestAnimationFrame(frame);
 
@@ -763,16 +825,19 @@ function press(k) { // empezar, seguir o reintentar
 const map_k = { ArrowLeft: "left", a: "left", A: "left", ArrowRight: "right", d: "right", D: "right", ArrowUp: "jump", w: "jump", W: "jump", " ": "jump", x: "fire", X: "fire", f: "fire", F: "fire", j: "fire", J: "fire", Shift: "fire", z: "fire", Z: "fire" };
 addEventListener("keydown", (e) => {
   const k = map_k[e.key]; if (e.repeat) { if (k) e.preventDefault(); return; }
+  audioInit();
+  if (e.key === "m" || e.key === "M") { toggleMusic(); return; }
   if (mode === "title" && /^[1-5]$/.test(e.key) && +e.key <= unlocked) { newGame(+e.key - 1); return; } // elegir nivel ya desbloqueado
   if (press(k)) { e.preventDefault(); return; }
   if (k) { keys[k] = true; if (k in tap) tap[k] = true; e.preventDefault(); }
 });
 addEventListener("keyup", (e) => { const k = map_k[e.key]; if (k) keys[k] = false; });
 addEventListener("blur", () => { keys.left = keys.right = keys.jump = keys.fire = false; });
-cv.addEventListener("pointerdown", () => { press(null); });
+cv.addEventListener("pointerdown", () => { audioInit(); press(null); });
+const musBtn = document.getElementById("mus"); if (musBtn) { musBtn.textContent = musicOn ? "♪" : "✕"; musBtn.addEventListener("click", toggleMusic); }
 document.querySelectorAll("#pad button").forEach((b) => {
   const k = b.dataset.k;
-  const on = (e) => { e.preventDefault(); if (press(k)) return; keys[k] = true; if (k in tap) tap[k] = true; b.classList.add("on"); b.setPointerCapture?.(e.pointerId); };
+  const on = (e) => { e.preventDefault(); audioInit(); if (press(k)) return; keys[k] = true; if (k in tap) tap[k] = true; b.classList.add("on"); b.setPointerCapture?.(e.pointerId); };
   const off = (e) => { e.preventDefault(); keys[k] = false; b.classList.remove("on"); };
   b.addEventListener("pointerdown", on); b.addEventListener("pointerup", off); b.addEventListener("pointercancel", off); b.addEventListener("lostpointercapture", off);
   b.addEventListener("contextmenu", (e) => e.preventDefault());
