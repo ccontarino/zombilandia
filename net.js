@@ -18,10 +18,21 @@ const DEFAULT_RELAY = "wss://zombilandia.ccontarino.workers.dev"; // dirección 
   const val = (v) => (typeof v === "boolean" ? +v : typeof v === "number" ? r1(v) : v ?? 0);
   const packP = (p) => { const a = PK.map((k) => val(p[k])); a.push(p.ray ? [Math.round(p.ray.x), Math.round(p.ray.y), Math.round(p.ray.w), p.ray.h] : 0); return a; };
   const packZ = (z) => ZK.map((k) => val(z[k]));
-  function unpackP(q, a) {
-    PK.forEach((k, i) => { if (k !== "x" && k !== "y") q[k] = a[i]; });
-    q.tx = a[0]; q.ty = a[1];
-    if (q.x === undefined || Math.abs(q.x - q.tx) > 48 || Math.abs(q.y - q.ty) > 48) { q.x = q.tx; q.y = q.ty; }
+  const OWN = new Set(["x", "y", "vx", "vy", "face", "step", "ground", "springT"]);
+  function unpackP(q, a, own) {
+    const pred = own && mode === "play" && !a[PK.indexOf("dead")] && !q.dead && q.x !== undefined && q.synced;
+    PK.forEach((k, i) => { if (k !== "x" && k !== "y" && !(pred && OWN.has(k))) q[k] = a[i]; });
+    q.tx = a[0]; q.ty = a[1]; q.pred = !!pred;
+    if (pred) { // reconciliación: comparo con dónde estaría el servidor ahora (un viaje de ida y vuelta después)
+      const d = Math.max(2, Math.min(20, rtt / 16.7)), svx = a[2], svy = a[3], gr = a[PK.indexOf("ground")];
+      const ex = a[0] + svx * d, ey = a[1] + (gr ? 0 : svy * d + .14 * d * d);
+      if (Math.abs(ex - q.x) > 48 || Math.abs(ey - q.y) > 48) { q.x = a[0]; q.y = a[1]; q.vx = svx; q.vy = svy; }
+      else { q.x += (ex - q.x) * .2; q.y += (ey - q.y) * .2; }
+    } else {
+      if (q.x === undefined || Math.abs(q.x - q.tx) > 48 || Math.abs(q.y - q.ty) > 48) { q.x = q.tx; q.y = q.ty; }
+      if (own && mode === "play" && !a[PK.indexOf("dead")]) q.synced = true;
+      else if (own) q.synced = false;
+    }
     const t = TIERS[q.tier] || TIERS[0]; q.w = t.w; q.h = t.h; q.big = q.tier > 0;
     const r = a[PK.length]; q.ray = r ? { x: r[0], y: r[1], w: r[2], h: r[3] } : null;
   }
@@ -99,16 +110,17 @@ const DEFAULT_RELAY = "wss://zombilandia.ccontarino.workers.dev"; // dirección 
     levelIdx = m.idx; endless = !!m.en; goalX = m.goal; arena = m.arena; distOff = m.dist; totalBrains = m.tb; deco = m.deco;
     for (let y = 0; y < ROWS; y++) for (let x = 0; x < COLS; x++) map[y][x] = m.map[y][x];
     items = m.items.map(([x, y, k, g]) => ({ x, y, w: 8, h: 8, got: !!g, kind: k || undefined }));
+    for (const q of players) q.synced = false;
     movers = m.mv.map(([w, x0, y0]) => ({ x0, y0, x: x0, y: y0, tx: x0, ty: y0, w, h: 8, dx: 0, dy: 0, sp: 0, t: 0, vx: 0, vy: 0 }));
     zombies = []; shots = []; parts = []; falling = []; crumble = {}; regrow = [];
   }
   function applySnap(m) {
     gotSnap = true; note = "";
-    m.p.forEach((a, i) => { const q = players[i] || (players[i] = mkPlayer(i, null)); unpackP(q, a); });
+    m.p.forEach((a, i) => { const q = players[i] || (players[i] = mkPlayer(i, null)); unpackP(q, a, i === 1); });
     const old = new Map(zombies.map((z) => [z.uid, z]));
     zombies = m.z.map((a) => unpackZ(a, old.get(a[0])));
     shots = m.sh.map(([x, y, r, col, kind]) => ({ x, y, r, col, kind: kind || undefined }));
-    m.mv.forEach(([x, y], i) => { if (movers[i]) { movers[i].tx = x; movers[i].ty = y; } });
+    m.mv.forEach(([x, y], i) => { const o = movers[i]; if (o) { if (o.tx !== undefined) { o.vx = (x - o.tx) / 3; o.vy = (y - o.ty) / 3; } o.tx = x; o.ty = y; } });
     falling = m.fl.map(([x, y]) => ({ x, y, vy: 0 })); crumble = {}; for (const k of m.cr) crumble[k] = 1;
     levelTime = m.lt; banner = m.bn; if (m.sk > shake) shake = m.sk;
     if (m.ig) for (const i of m.ig) if (items[i]) items[i].got = true;
@@ -138,9 +150,16 @@ const DEFAULT_RELAY = "wss://zombilandia.ccontarino.workers.dev"; // dirección 
     if (mode === "play" && (sig !== lastSig || tj || tf || tickN % 30 === 0)) { send({ t: "i", l: +k.left, r: +k.right, j: +k.jump, f: +k.fire, tj: +tj, tf: +tf }); lastSig = sig; }
     else if (mode !== "play" && tickN % 30 === 0) send({ t: "i", l: 0, r: 0, j: 0, f: 0 }); // señal de vida
     if (tickN % 60 === 0) send({ t: "ping", ts: performance.now() });
-    for (const q of players) if (q.tx !== undefined) { q.x += (q.tx - q.x) * .4; q.y += (q.ty - q.y) * .4; }
+    for (const q of players) if (q.tx !== undefined && !(q.pred && mode === "play")) { q.x += (q.tx - q.x) * .4; q.y += (q.ty - q.y) * .4; }
     for (const z of zombies) if (z.tx !== undefined) { z.x += (z.tx - z.x) * .4; z.y += (z.ty - z.y) * .4; }
     for (const m of movers) if (m.tx !== undefined) { m.x += (m.tx - m.x) * .4; m.y += (m.ty - m.y) * .4; }
+    const me1 = players[1];
+    if (me1 && me1.pred && mode === "play") { // predicción: muevo mi personaje ya, sin esperar al anfitrión
+      pi = 1; player = me1; K = keys; TP = { jump: tj, fire: false }; net.quiet = true;
+      try { movePlayer(me1); } finally { net.quiet = false; K = keys; TP = tap; }
+      if (me1.ground && Math.abs(me1.vx) > .3) me1.step += Math.abs(me1.vx) * .12;
+      if (keys.left) me1.face = -1; else if (keys.right) me1.face = 1;
+    }
     for (const q of parts) { q.x += q.vx; q.y += q.vy; q.vy += .15; q.life--; }
     parts = parts.filter((q) => q.life > 0);
     if (shake) shake--; if (msgT) msgT--; if (shopMsgT) shopMsgT--;

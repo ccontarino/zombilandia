@@ -1,7 +1,7 @@
 "use strict";
 // Zombilandia: platformer de zombies en canvas, sin librerías. Personajes y arte propios (rects de píxel).
 // 5 niveles: cementerio, ciudad en ruinas, pantano tóxico, laboratorio y la guarida del Rey Zombi (jefe final).
-const VERSION = "v25"; // subir en cada publicación (también en index.html)
+const VERSION = "v26"; // subir en cada publicación (también en index.html)
 const T = 16, H = 240, ROWS = 15, COLS = 215;
 let W = 480, cache = {};
 const cv = document.getElementById("c"), g = cv.getContext("2d");
@@ -104,7 +104,7 @@ const keys = { left: false, right: false, jump: false, fire: false }, tap = { ju
 const keys2 = { left: false, right: false, jump: false, fire: false }, tap2 = { jump: false, fire: false };
 const inputs = [keys, keys2], taps = [tap, tap2];
 let players = [], pi = 0, K = keys, TP = tap, nPlayers = 1;
-const net = { role: null, peer: false, paused: false, rec: null, step() {}, press() { return false; } }; // lo completa net.js
+const net = { role: null, peer: false, paused: false, rec: null, quiet: false, step() {}, press() { return false; } }; // lo completa net.js
 const me = () => (net.role === "guest" ? 1 : 0);
 const ctx = (i) => { pi = i; player = players[i]; K = inputs[i]; TP = taps[i]; }; // "player" es el jugador que se está procesando
 const ZT = {
@@ -331,7 +331,7 @@ function collideY(o) {
     } else {
       o.y = (ty + 1) * T;
       const blk = map[ty][x];
-      if (players.includes(o) && (blk === "?" || blk === "S" || blk === "O")) {
+      if (players.includes(o) && net.role !== "guest" && (blk === "?" || blk === "S" || blk === "O")) {
         const kind = { "?": "brain", S: "syringe", O: "shield" }[blk]; map[ty][x] = "u";
         items.push({ x: x * T + 4, y: ty * T - 10, w: 8, h: 8, got: false, kind });
         beep(kind === "brain" ? 520 : 700, .08, "square"); burst(x * T + 8, ty * T, { brain: "#f2c94c", syringe: "#ff5a3a", shield: "#7fd8ff" }[kind], kind === "brain" ? 5 : 10);
@@ -346,6 +346,7 @@ const touching = (o, ch, pad = 3) => [[o.x + pad, o.y + pad], [o.x + o.w - pad, 
 
 // ---------- Audio ----------
 let ac; const beep = (f, d, type = "square", f2, delay = 0) => {
+  if (net.quiet) return;
   if (net.rec) net.rec.push([0, f, d, type, f2, delay]);
   try {
     ac ||= new (window.AudioContext || window.webkitAudioContext)();
@@ -422,7 +423,7 @@ const fanfare = () => [523, 659, 784, 1047].forEach((f, i) => beep(f, .18, "tria
 
 // ---------- Lógica ----------
 const say = (t) => { msg = t; msgT = 120; if (net.rec) net.rec.push([2, t]); };
-function burst(x, y, col, n = 8, sp = 3) { if (net.rec) net.rec.push([1, Math.round(x), Math.round(y), col, n, sp]); for (let i = 0; i < n; i++) parts.push({ x, y, vx: (Math.random() - .5) * sp, vy: -Math.random() * sp - .5, life: 30 + Math.random() * 20, col }); }
+function burst(x, y, col, n = 8, sp = 3) { if (net.quiet) return; if (net.rec) net.rec.push([1, Math.round(x), Math.round(y), col, n, sp]); for (let i = 0; i < n; i++) parts.push({ x, y, vx: (Math.random() - .5) * sp, vy: -Math.random() * sp - .5, life: 30 + Math.random() * 20, col }); }
 // Jeringa: modo bestia. Más grande y musculoso, corre más rápido y el rayo pega más fuerte.
 // Una segunda jeringa da el modo bestia x2 (el doble de grande). Cada golpe te baja un nivel de poder en vez de sacarte una vida;
 // perder una vida te deja normal. Se mantiene entre niveles.
@@ -565,15 +566,13 @@ function updateZombie(z) {
   if (z.y > ROWS * T + 30 || touching(z, "~", 4)) { z.dead = 1; burst(z.x + 6, z.y + 6, TH.liquid?.[0] || "#7fbf5a", 6); return; }
   touchZombie(z);
 }
-function stepPlayer(i) {
-  ctx(i);
-  const p0 = player; // (ctx ya fijó al jugador)
+function movePlayer(p0) { // movimiento puro del jugador (ctx ya fijó K y TP); el invitado también lo corre para predecir su propio personaje
   if (p0.onMover) { p0.x += p0.onMover.vx; p0.y = p0.onMover.y - p0.h; }
   const wet = tileAt(p0.x + p0.w / 2, p0.y + p0.h / 2) === "W"; // nadando
   if (wet && !p0.wet) { burst(p0.x + 5, p0.y + 4, "#9ad7ff", 10); beep(300, .2, "sine", 120); }
   p0.wet = wet;
-  const p = player, acc = (p.ground ? 0.35 : 0.22) * TIER.acc[p.tier] * (wet ? .6 : 1), max = TIER.max[p.tier] * (wet ? .65 : 1);
-  if (p.growing) tryGrow();
+  const p = p0, acc = (p.ground ? 0.35 : 0.22) * TIER.acc[p.tier] * (wet ? .6 : 1), max = TIER.max[p.tier] * (wet ? .65 : 1);
+  if (p.growing && net.role !== "guest") tryGrow();
   if (K.left) { p.vx -= acc; p.face = -1; } else if (K.right) { p.vx += acc; p.face = 1; } else p.vx *= p.ground ? 0.78 : 0.95;
   p.vx = Math.max(-max, Math.min(max, p.vx));
   p.coyote = p.ground ? 6 : p.coyote - 1;
@@ -593,13 +592,18 @@ function stepPlayer(i) {
   if (p.vy >= 0) for (const m of [...movers, ...ices]) if (p.x + p.w > m.x + 1 && p.x < m.x + m.w - 1 && pb <= m.y + 4 && p.y + p.h >= m.y) { p.y = m.y - p.h; p.vy = 0; p.ground = true; p.onMover = m.ice ? null : m; break; }
   if (p.ground && !p.onMover) for (const xx of [p.x + 1, p.x + p.w - 1]) { // plataformas que se derrumban
     const tx = Math.floor(xx / T), ty = Math.floor((p.y + p.h + 2) / T), k = tx + "," + ty;
-    if (map[ty]?.[tx] === "F" && !(k in crumble)) { crumble[k] = 28; beep(180, .1, "square", 120); }
+    if (map[ty]?.[tx] === "F" && !(k in crumble) && net.role !== "guest") { crumble[k] = 28; beep(180, .1, "square", 120); }
   }
   if (p.ground && !p.wasG && vyb > 2.5) burst(p.x + 5, p.y + 14, "#9a8a7a", 6); // polvo al caer
   if (p.ground && Math.abs(p.vx) > 1.5 && time % 9 === 0) burst(p.x + 5, p.y + 14, "#6a5a4a", 1);
   p.wasG = p.ground;
   if (p.x < 0) p.x = 0;
   if (p.ground && time % 15 === 0 && !touching(p, "x", 0) && solid(Math.floor((p.x + 1) / T), Math.floor((p.y + p.h + 2) / T)) && solid(Math.floor((p.x + p.w - 1) / T), Math.floor((p.y + p.h + 2) / T))) p.safe = { x: p.x, y: p.y };
+}
+function stepPlayer(i) {
+  ctx(i);
+  const p = player;
+  movePlayer(p);
   // rayo láser de ojos: se dispara al apretar, con recarga
   if (p.cd > 0) p.cd--;
   if ((TP.fire || K.fire && !p.firePrev) && p.cd <= 0) {
