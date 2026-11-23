@@ -1,7 +1,7 @@
 "use strict";
 // Zombilandia: platformer de zombies en canvas, sin librerías. Personajes y arte propios (rects de píxel).
 // 5 niveles: cementerio, ciudad en ruinas, pantano tóxico, laboratorio y la guarida del Rey Zombi (jefe final).
-const VERSION = "v7"; // subir en cada publicación (también en index.html)
+const VERSION = "v8"; // subir en cada publicación (también en index.html)
 const T = 16, H = 240, ROWS = 15, COLS = 190;
 let W = 480, cache = {};
 const cv = document.getElementById("c"), g = cv.getContext("2d");
@@ -117,10 +117,11 @@ function makeZombie(x, y, type, i) {
   return { x, y, w: k.w, h: k.h, type, hp: k.hp, vx: (i % 2 ? 1 : -1) * k.speed * (.85 + rnd(i) * .3), vy: 0, dead: 0, step: i, t: i * 17, flash: 0, shot: -1, idx: i };
 }
 function loadLevel(i) {
+  const keepBig = player && (player.big || player.growing); // el modo bestia pasa al nivel siguiente
   levelIdx = i; L = LEVELS[i]; TH = THEMES[L.theme]; cache = {};
   for (const row of map) row.fill(" ");
   const info = L.build(); goalX = info.goal;
-  player = { x: 40, y: 150, vx: 0, vy: 0, w: 10, h: 14, face: 1, ground: false, coyote: 0, jumps: 0, cd: 0, beam: 0, beamDir: 1, ray: null, firePrev: false, shot: 0, inv: 0, dead: 0, step: 0, springT: 0, big: false, growing: false, power: 0, beamBig: false, safe: { x: 40, y: 150 } };
+  player = { x: 40, y: 150, vx: 0, vy: 0, w: 10, h: 14, face: 1, ground: false, coyote: 0, jumps: 0, cd: 0, beam: 0, beamDir: 1, ray: null, firePrev: false, shot: 0, inv: 0, dead: 0, step: 0, springT: 0, big: false, growing: keepBig, power: keepBig ? 1 : 0, beamBig: false, safe: { x: 40, y: 150 } };
   zombies = [];
   info.spawns.forEach(([col, type], n) => { const r = surface(col), k = ZT[type]; if (r > 0) zombies.push(makeZombie(col * T + (T - k.w) / 2, r * T - k.h, type, n)); });
   items = [];
@@ -134,7 +135,7 @@ function loadLevel(i) {
   parts = []; cam = 0; shake = 0; msg = ""; msgT = 0; banner = 160; bossDead = false; arenaLocked = false; levelStart = score;
   if (i + 1 > unlocked) { unlocked = i + 1; try { localStorage.setItem("zombilandia-nivel", unlocked); } catch {} }
 }
-function newGame(i) { score = 0; lives = 3; brains = 0; loadLevel(i); mode = "play"; }
+function newGame(i) { player = null; score = 0; lives = 3; brains = 0; loadLevel(i); mode = "play"; }
 loadLevel(0);
 
 function collideX(o) {
@@ -191,10 +192,11 @@ const fanfare = () => [523, 659, 784, 1047].forEach((f, i) => beep(f, .18, "tria
 // ---------- Lógica ----------
 const say = (t) => { msg = t; msgT = 120; };
 function burst(x, y, col, n = 8, sp = 3) { for (let i = 0; i < n; i++) parts.push({ x, y, vx: (Math.random() - .5) * sp, vy: -Math.random() * sp - .5, life: 30 + Math.random() * 20, col }); }
-// Jeringa: modo bestia. Más grande y musculoso, corre más rápido y el rayo pega x3. Un golpe te saca el poder en vez de una vida.
-const POWER = 900, BIG = { w: 14, h: 21 };
+// Jeringa: modo bestia. Más grande y musculoso, corre más rápido y el rayo pega x3.
+// Dura hasta que te golpean (perdés el poder en vez de una vida) o perdés una vida. Se mantiene entre niveles.
+const BIG = { w: 14, h: 21 };
 function powerUp() {
-  const p = player; p.power = POWER; if (!p.big) p.growing = true;
+  const p = player; p.power = 1; if (!p.big) p.growing = true;
   say("¡MODO BESTIA!"); shake = 6; [196, 262, 330, 392, 523, 659].forEach((f, i) => beep(f, .12, "square", 0, i * .06));
 }
 function tryGrow() {
@@ -259,7 +261,6 @@ function update() {
   if (mode !== "play") return;
   const p = player, acc = (p.ground ? 0.35 : 0.22) * (p.big ? 1.3 : 1), max = p.big ? 2.8 : 1.9;
   if (p.growing) tryGrow();
-  if (p.power > 0 && --p.power === 0) shrink();
   if (keys.left) { p.vx -= acc; p.face = -1; } else if (keys.right) { p.vx += acc; p.face = 1; } else p.vx *= p.ground ? 0.78 : 0.95;
   p.vx = Math.max(-max, Math.min(max, p.vx));
   p.coyote = p.ground ? 6 : p.coyote - 1;
@@ -637,7 +638,7 @@ function drawPlayer() {
   let x = Math.round(p.x - cam) - 1, y = Math.round(p.y);
   if (big) { // modo bestia: el mismo sprite a 1,5x con músculos y aura
     g.save(); g.translate(x - 1, y); g.scale(1.5, 1.5); x = 0; y = 0;
-    const end = p.power < 120 && (p.power >> 3) % 2; g.globalAlpha = end ? .08 : .16 + Math.sin(time * .25) * .07; R(-2, -3, 16, 19, "#ff5a3a"); g.globalAlpha = 1;
+    g.globalAlpha = .16 + Math.sin(time * .25) * .07; R(-2, -3, 16, 19, "#ff5a3a"); g.globalAlpha = 1;
   }
   const P = (dx, dy, w, h, c) => R(f > 0 ? x + dx : x + 12 - dx - w, y + dy, w, h, c); // dibuja espejado según hacia dónde mira
   if (!air) { g.globalAlpha = .35; R(x + 1, y + 14, 10, 1, "#000"); g.globalAlpha = 1; }
@@ -680,7 +681,7 @@ function hud() {
   text("N" + (levelIdx + 1), W - 72, 3, "#cfc8e8");
   const pct = Math.min(1, player.x / (goalX * T)); R(W - 52, 6, 40, 4, "#2e2152"); R(W - 52, 6, Math.round(40 * pct), 4, "#7cc456"); R(W - 10, 3, 1, 9, "#cfc8e8"); R(W - 9, 3, 5, 4, "#d6453d");
   text("RAYO", 8, 15, "#7ff5ff"); R(36, 18, 40, 4, "#1d3a4a"); R(36, 18, Math.round(40 * (1 - player.cd / 40)), 4, player.cd ? "#3fd9ff" : "#bff8ff");
-  if (player.power > 0) { text("BESTIA", 84, 15, "#ffb03a"); R(122, 18, 40, 4, "#4a1a0a"); R(122, 18, Math.round(40 * player.power / POWER), 4, "#ff7a1a"); }
+  if (player.power > 0) text("BESTIA", 84, 15, Math.sin(time * .15) > 0 ? "#ffb03a" : "#ff7a1a");
   const boss = L.boss && arenaLocked && zombies.find((z) => z.type === "boss" && !z.dead);
   if (boss) { g.textAlign = "center"; text("REY ZOMBI", W / 2, 33, "#e8b830"); R(W / 2 - 60, 45, 120, 5, "#2a0a0a"); R(W / 2 - 60, 45, Math.round(120 * boss.hp / ZT.boss.hp), 5, "#e02a4a"); R(W / 2 - 60, 45, Math.round(120 * boss.hp / ZT.boss.hp), 1, "#ff8a9a"); g.textAlign = "left"; }
   if (msgT) { g.textAlign = "center"; text(msg, W / 2, 60, "#f2c94c"); g.textAlign = "left"; }
@@ -750,5 +751,5 @@ document.querySelectorAll("#pad button").forEach((b) => {
 });
 window.__game = {
   get state() { return { mode, level: levelIdx + 1, lives, score, brains, x: player.x, y: player.y, bossDead, arenaLocked, big: player.big, power: player.power }; }, keys,
-  debug: { load(i) { newGame(i); }, tp(col) { const r = surface(col); Object.assign(player, { x: col * T, y: (r > 0 ? r : 10) * T - 16, vx: 0, vy: 0 }); }, god() { lives = 99; }, power() { powerUp(); }, get boss() { const z = zombies.find((z) => z.type === "boss"); return z && { x: z.x, hp: z.hp, dead: z.dead }; } },
+  debug: { load(i) { newGame(i); }, tp(col) { const r = surface(col); Object.assign(player, { x: col * T, y: (r > 0 ? r : 10) * T - 16, vx: 0, vy: 0 }); }, god() { lives = 99; }, power() { powerUp(); }, peace() { zombies.length = 0; }, get boss() { const z = zombies.find((z) => z.type === "boss"); return z && { x: z.x, hp: z.hp, dead: z.dead }; } },
 };
