@@ -209,3 +209,98 @@ function decoArt(x, k, T, theme) {
   }
 }
 function rr2x(x, X, Y, w, h, r) { x.roundRect ? x.roundRect(X, Y, w, h, r) : x.rect(X, Y, w, h); }
+
+// ---------- Pinchos, resorte, items y capas de suelo por escenario ----------
+const SPIKE_COL = { metal: ["#f4f8ff", "#9aa6b8", "#3a3a44"], ice: ["#f0fcff", "#7acaf0", "#2a6a9a"], thorn: ["#d8f89a", "#4aa83a", "#1a4a1a"], bone: ["#fffaf0", "#d8c8a0", "#8a7850"], crystal: ["#f0ffd8", "#7aff4a", "#2a8a1a"], lava: ["#ffe8a0", "#ff7a2a", "#7a1a0a"] };
+function spikeArt(x, T, kind) {
+  const [c0, c1, c2] = SPIKE_COL[kind] || SPIKE_COL.metal, hs = kind === "ice" || kind === "crystal" ? [9, 12, 8, 11] : [8, 10, 8, 10];
+  x.lineJoin = x.lineCap = "round";
+  rrect(x, 0, 13, T, 3, 1); x.fillStyle = vgradA(x, 13, 16, "#55555f", "#26262e"); x.fill();
+  x.fillStyle = "rgba(255,255,255,.25)"; x.fillRect(1, 13, T - 2, .6);
+  for (let i = 0; i < 4; i++) {
+    const cx = 2 + i * 4, h = hs[i], w = kind === "thorn" ? 1.5 : 2, tip = 13 - h;
+    x.fillStyle = "rgba(0,0,0,.3)"; x.beginPath(); x.moveTo(cx - w + .6, 13.4); x.lineTo(cx + .6, tip + .8); x.lineTo(cx + w + .6, 13.4); x.fill();
+    x.beginPath(); x.moveTo(cx - w, 13.2); if (kind === "thorn") x.quadraticCurveTo(cx - .2, tip + h * .5, cx + (i % 2 ? 1 : -1), tip); else x.lineTo(cx, tip); x.lineTo(cx + w, 13.2); x.closePath();
+    const gr = x.createLinearGradient(cx - w, 0, cx + w, 0); gr.addColorStop(0, c0); gr.addColorStop(.45, c1); gr.addColorStop(1, c2); x.fillStyle = gr; x.fill(); x.lineWidth = .4; x.strokeStyle = "rgba(10,6,20,.5)"; x.stroke();
+    x.fillStyle = "rgba(255,255,255,.6)"; x.beginPath(); x.moveTo(cx - w * .5, 12); x.lineTo(cx - .2, tip + 1.4); x.lineTo(cx - .2, 12); x.fill();
+    if (kind === "lava") { x.fillStyle = "#ff3a10"; x.beginPath(); x.arc(cx, tip + .6, .9, 0, 7); x.fill(); }
+  }
+}
+const vgradA = (x, y0, y1, a, b) => { const g = x.createLinearGradient(0, y0, 0, y1); g.addColorStop(0, a); g.addColorStop(1, b); return g; };
+// Resorte: base, espiral y almohadilla roja (c = cuánto está comprimido)
+function springArt(x, T, c) {
+  rrect(x, 1, 13, 14, 3, 1.2); x.fillStyle = vgradA(x, 13, 16, "#8a8a98", "#3a3a46"); x.fill();
+  x.strokeStyle = "#d8e0ea"; x.lineWidth = 1.1; x.lineCap = "round"; const top = 5 + c, n = 4;
+  x.beginPath(); for (let k = 0; k <= n; k++) { const yy = 13 - (13 - top - 2) * (k / n); x.lineTo(k % 2 ? 11.5 : 4.5, yy); } x.stroke();
+  x.strokeStyle = "rgba(0,0,0,.35)"; x.lineWidth = .5; x.beginPath(); for (let k = 0; k <= n; k++) { const yy = 13.6 - (13 - top - 2) * (k / n); x.lineTo(k % 2 ? 11.5 : 4.5, yy); } x.stroke();
+  rrect(x, .6, top - 1.6, 14.8, 3.4, 1.6); x.fillStyle = vgradA(x, top - 2, top + 2, "#ff7a5a", "#b01c14"); x.fill(); x.lineWidth = .5; x.strokeStyle = "rgba(10,6,20,.6)"; x.stroke();
+  x.fillStyle = "rgba(255,255,255,.55)"; rrect(x, 2, top - 1.1, 11, .9, .5); x.fill();
+}
+// Items (se dibujan en 16x16 centrados)
+function itemArt(x, kind) {
+  x.lineJoin = x.lineCap = "round";
+  if (kind === "shield") {
+    const gr = x.createRadialGradient(6.4, 6, 1, 8, 8, 7.2); gr.addColorStop(0, "rgba(220,250,255,.9)"); gr.addColorStop(.7, "rgba(110,210,255,.55)"); gr.addColorStop(1, "rgba(60,150,230,.85)");
+    x.beginPath(); x.arc(8, 8, 6.6, 0, 7); x.fillStyle = gr; x.fill(); x.lineWidth = .9; x.strokeStyle = "#e8fbff"; x.stroke();
+    x.beginPath(); x.moveTo(8, 4); x.lineTo(11.2, 5.4); x.lineTo(10.6, 9.4); x.quadraticCurveTo(8, 12.4, 5.4, 9.4); x.lineTo(4.8, 5.4); x.closePath(); x.fillStyle = "rgba(30,90,170,.55)"; x.fill();
+    x.fillStyle = "rgba(255,255,255,.8)"; x.beginPath(); x.ellipse(5.6, 4.6, 1.6, .9, -.7, 0, 7); x.fill();
+  } else if (kind === "syringe") {
+    x.save(); x.translate(8, 8); x.rotate(-.7);
+    x.fillStyle = "#c0c8d4"; x.fillRect(-7.4, -.3, 3, .6); rrect(x, -5, -1.6, 2, 3.2, .8); x.fillStyle = "#8a9098"; x.fill();
+    rrect(x, -3.4, -2.6, 8, 5.2, 1.4); x.fillStyle = vgradA(x, -2.6, 2.6, "#f4f8ff", "#a8b4c4"); x.fill(); x.lineWidth = .5; x.strokeStyle = "rgba(10,6,20,.6)"; x.stroke();
+    rrect(x, -2.4, -1.6, 5.6, 3.2, 1); x.fillStyle = vgradA(x, -1.6, 1.6, "#ff6a5a", "#c01810"); x.fill();
+    x.fillStyle = "rgba(255,255,255,.7)"; x.fillRect(-2, -1.4, 4.4, .6);
+    x.fillStyle = "#d8e0ea"; rrect(x, 4.8, -3.6, 1.4, 7.2, .6); x.fill(); rrect(x, 6, -.7, 2.4, 1.4, .6); x.fill(); x.restore();
+  } else {
+    const g1 = x.createRadialGradient(6, 5.4, .5, 8, 8, 7); g1.addColorStop(0, "#ffc4d8"); g1.addColorStop(.6, "#e8789c"); g1.addColorStop(1, "#a83a62");
+    x.beginPath(); x.moveTo(8, 3.2); x.bezierCurveTo(4.6, 1.2, 1.4, 3.8, 2.4, 7); x.bezierCurveTo(1.2, 9.4, 3.2, 12, 6.2, 11.4); x.bezierCurveTo(6.8, 13, 9.6, 13, 10.2, 11.4); x.bezierCurveTo(13, 12, 14.8, 9.4, 13.6, 7); x.bezierCurveTo(14.6, 3.8, 11.4, 1.2, 8, 3.2); x.closePath();
+    x.fillStyle = g1; x.fill(); x.lineWidth = .5; x.strokeStyle = "rgba(90,20,50,.7)"; x.stroke();
+    x.strokeStyle = "rgba(150,40,80,.75)"; x.lineWidth = .55; x.beginPath(); x.moveTo(8, 3.6); x.quadraticCurveTo(7.2, 7, 8, 11.6); x.moveTo(3.4, 6.2); x.quadraticCurveTo(5.4, 6.6, 6.4, 5); x.moveTo(12.6, 6.2); x.quadraticCurveTo(10.6, 6.6, 9.6, 5); x.moveTo(4, 9); x.quadraticCurveTo(5.6, 8.4, 6.6, 9.4); x.moveTo(12, 9); x.quadraticCurveTo(10.4, 8.4, 9.4, 9.4); x.stroke();
+    x.fillStyle = "rgba(255,255,255,.55)"; x.beginPath(); x.ellipse(5, 4.8, 1.6, .9, -.5, 0, 7); x.fill();
+  }
+}
+// Capas superiores del suelo por escenario (se dibujan sobre dirtArt, hacia arriba: y<0 es el borde)
+function snowCapArt(x, T, v, gs) {
+  const r = rngA(700 + v), [g1, g2, g3] = gs;
+  x.fillStyle = "rgba(0,0,30,.35)"; x.fillRect(0, 4, T, 3);
+  const gr = x.createLinearGradient(0, -2, 0, 6); gr.addColorStop(0, g1); gr.addColorStop(.6, g2); gr.addColorStop(1, g3);
+  x.fillStyle = gr; x.beginPath(); x.moveTo(0, -2.5); x.lineTo(T, -2.5); x.lineTo(T, 3.6);
+  for (let xx = T; xx >= 0; xx -= 1) { const ic = (Math.sin(xx * 1.7 + v * 3) > .86) ? 2.6 + r() * 1.4 : 0; x.lineTo(xx, 3.4 + Math.sin(xx / T * 6.28 * 2 + v) * 1 + ic); }
+  x.closePath(); x.fill();
+  x.fillStyle = "rgba(255,255,255,.85)"; for (let i = 0; i < 4; i++) { x.beginPath(); x.arc(r() * T, -1.4 + r() * 3, .45, 0, 7); x.fill(); }
+  x.strokeStyle = "rgba(255,255,255,.9)"; x.lineWidth = .6; x.beginPath(); x.moveTo(0, -2.2); x.lineTo(T, -2.2); x.stroke();
+}
+function sandTopArt(x, T, v, gs) {
+  const r = rngA(800 + v), [g1, g2, g3] = gs;
+  const gr = x.createLinearGradient(0, -2, 0, 5); gr.addColorStop(0, g1); gr.addColorStop(.6, g2); gr.addColorStop(1, g3);
+  x.fillStyle = gr; x.beginPath(); x.moveTo(0, -2); x.lineTo(T, -2); x.lineTo(T, 3.4); for (let xx = T; xx >= 0; xx--) x.lineTo(xx, 3.2 + Math.sin(xx / T * 6.28 + v) * 1); x.closePath(); x.fill();
+  x.strokeStyle = "rgba(120,70,20,.35)"; x.lineWidth = .5; for (let k = 0; k < 2; k++) { const yy = -.2 + k * 1.8; x.beginPath(); for (let xx = 0; xx <= T; xx += 1) x.lineTo(xx, yy + Math.sin(xx * .6 + v + k) * .5); x.stroke(); }
+  x.fillStyle = "rgba(255,245,200,.7)"; x.fillRect(0, -2, T, .7);
+  for (let i = 0; i < 5; i++) { x.fillStyle = "rgba(255,240,190,.6)"; x.fillRect(r() * T, -1.2 + r() * 3, .7, .6); }
+}
+function candyTopArt(x, T, v, gs) {
+  const [g1, g2, g3] = gs; rrect(x, 0, -2, T, 6, 1); x.fillStyle = vgradA(x, -2, 4, g1, g3); x.fill();
+  x.save(); x.beginPath(); x.rect(0, -2, T, 6); x.clip(); x.fillStyle = "rgba(255,255,255,.4)"; for (let k = -2; k < 6; k++) { x.beginPath(); x.moveTo(k * 5 + (v % 2) * 2.5, 4); x.lineTo(k * 5 + 2.4 + (v % 2) * 2.5, 4); x.lineTo(k * 5 + 5.4 + (v % 2) * 2.5, -2); x.lineTo(k * 5 + 3 + (v % 2) * 2.5, -2); x.fill(); } x.restore();
+  x.fillStyle = "rgba(255,255,255,.8)"; x.fillRect(0, -2, T, .8); x.fillStyle = "rgba(0,0,0,.3)"; x.fillRect(0, 3.4, T, .8);
+}
+function dustTopArt(x, T, v, gs) {
+  const r = rngA(900 + v), [g1, g2, g3] = gs; x.fillStyle = vgradA(x, -2, 4, g1, g3); x.beginPath(); x.moveTo(0, -2); x.lineTo(T, -2); x.lineTo(T, 3); for (let xx = T; xx >= 0; xx--) x.lineTo(xx, 2.8 + (r() - .5) * .7); x.closePath(); x.fill();
+  x.fillStyle = "rgba(0,0,0,.25)"; for (let i = 0; i < 2; i++) { x.beginPath(); x.ellipse(2 + r() * 12, .6, 1.6 + r(), .6, 0, 0, 7); x.fill(); } x.fillStyle = "rgba(255,255,255,.7)"; x.fillRect(0, -2, T, .7);
+}
+// Plataformas por escenario
+function iceBlockArt(x, T, v, pal) {
+  const [p0, p1, p2] = pal; rrect(x, .3, .3, T - .6, 13, 2); x.fillStyle = vgradA(x, 0, 13, lerpHex(p1, "#ffffff", .4), p0); x.fill(); x.lineWidth = .7; x.strokeStyle = p2; x.stroke();
+  x.fillStyle = "rgba(255,255,255,.55)"; rrect(x, 1.4, 1, T - 2.8, 2.4, 1); x.fill();
+  const r = rngA(61 + v); x.strokeStyle = "rgba(255,255,255,.55)"; x.lineWidth = .5; for (let i = 0; i < 2; i++) { const sx = 3 + r() * 10; x.beginPath(); x.moveTo(sx, 4); x.lineTo(sx + 2, 7); x.lineTo(sx + 1, 10); x.stroke(); }
+  x.fillStyle = vgradA(x, 12, 16, "rgba(122,200,240,.8)", "rgba(122,200,240,0)"); for (const sx of [3, 9, 13]) { x.beginPath(); x.moveTo(sx - 1, 12.6); x.lineTo(sx, 12.6 + 2 + r() * 2); x.lineTo(sx + 1, 12.6); x.fill(); }
+}
+function sandstoneArt(x, T, v, pal) {
+  brickArt(x, T, v, pal, "#3a2010", .2); const r = rngA(33 + v);
+  x.strokeStyle = "rgba(60,30,10,.55)"; x.lineWidth = .6; const gx = 3 + r() * 5, gy = 3 + r() * 3; x.beginPath(); x.moveTo(gx, gy); x.lineTo(gx + 3, gy); x.lineTo(gx + 3, gy + 2); x.moveTo(gx + 5, gy + 3); x.lineTo(gx + 7, gy + 3); x.stroke();
+  x.fillStyle = "rgba(255,230,160,.5)"; x.fillRect(0, 0, T, .8);
+}
+function awningArt(x, T, v, pal) {
+  const [p0, p1, p2] = pal; x.fillStyle = "#2a0c3e"; rrect(x, 0, 1, T, 13, 1.5); x.fill();
+  for (let k = 0; k < 4; k++) { x.fillStyle = k % 2 ? "#fff0f4" : p1; x.beginPath(); x.moveTo(k * 4, 2); x.lineTo(k * 4 + 4, 2); x.lineTo(k * 4 + 4, 10); x.arc(k * 4 + 2, 10, 2, 0, Math.PI); x.lineTo(k * 4, 2); x.fill(); }
+  x.fillStyle = vgradA(x, 2, 12, "rgba(255,255,255,.35)", "rgba(0,0,0,.2)"); x.fillRect(0, 2, T, 9); x.fillStyle = "rgba(255,255,255,.7)"; x.fillRect(0, 1.4, T, .8);
+}
