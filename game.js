@@ -1,7 +1,7 @@
 "use strict";
 // Zombilandia: platformer de zombies en canvas, sin librerías. Personajes y arte propios (rects de píxel).
 // 5 niveles: cementerio, ciudad en ruinas, pantano tóxico, laboratorio y la guarida del Rey Zombi (jefe final).
-const VERSION = "v20"; // subir en cada publicación (también en index.html)
+const VERSION = "v21"; // subir en cada publicación (también en index.html)
 const T = 16, H = 240, ROWS = 15, COLS = 215;
 let W = 480, cache = {};
 const cv = document.getElementById("c"), g = cv.getContext("2d");
@@ -27,9 +27,9 @@ function surface(col) { let r = ROWS - 1; if (!solid(col, r)) return -1; while (
 
 const THEMES = {
   cemetery: { sky: ["#07051a", "#22163f", "#4b2747", "#5e2f40"], stars: 1, moon: "#f4ecc8", cloud: "#2e2152", hill: "#1e1538", mid: "town", near: "graves", fog: "#aa96d2",
-    grass: ["#7cc456", "#4f8a35", "#2f5a22"], dirt: ["#4a3326", "#3a281f", "#2d1f18", "#5a4234"], plat: ["#7a3f2e", "#b0644a", "#4a2219"], deco: ["tomb", "cross", "bones", "weed", "weed"] },
+    grass: ["#7cc456", "#4f8a35", "#2f5a22"], dirt: ["#4a3326", "#3a281f", "#2d1f18", "#5a4234"], plat: ["#7a3f2e", "#b0644a", "#4a2219"], deco: ["tomb", "cross", "bones", "weed", "weed"], liquid: ["#7aff4a", "#2a8a1a"] },
   city: { sky: ["#140a14", "#3e1c24", "#8e3e26", "#c8703a"], stars: 0, moon: "#ffb070", cloud: "#4a2226", hill: "#2a1620", mid: "city", near: "rubble", fog: "#c87850", ambient: "ash",
-    grass: ["#a4a4b0", "#6e6e7a", "#3e3e48"], dirt: ["#55555f", "#44444e", "#2a2a32", "#6a6a74"], plat: ["#a8541e", "#e8964a", "#5a2810"], deco: ["cone", "barrel", "rubble", "rubble", "sign"] },
+    grass: ["#a4a4b0", "#6e6e7a", "#3e3e48"], dirt: ["#55555f", "#44444e", "#2a2a32", "#6a6a74"], plat: ["#a8541e", "#e8964a", "#5a2810"], deco: ["cone", "barrel", "rubble", "rubble", "sign"], liquid: ["#c6ff3a", "#5a9a10"] },
   swamp: { sky: ["#030a08", "#0c2a1e", "#1e4a2e", "#3a5a2a"], stars: 1, moon: "#d8f0a0", cloud: "#123222", hill: "#0a2016", mid: "swamp", near: "reeds", fog: "#78c878", ambient: "fireflies",
     grass: ["#8acb4a", "#4a7a2a", "#2a4a1a"], dirt: ["#3a2e1e", "#2e2416", "#22190f", "#4a3a26"], plat: ["#6a4a2a", "#8a6a3a", "#3a2614"], deco: ["mushroom", "reeds", "reeds", "bones", "weed"], liquid: ["#7aff4a", "#2a8a1a"] },
   lab: { indoor: 1, sky: ["#0a0e18", "#121a2a", "#1a2436", "#1e2a3e"], fog: "#50b4ff", ambient: "drips",
@@ -132,7 +132,15 @@ function makeZombie(x, y, type, i) {
   const k = ZT[type];
   return { x, y, w: k.w, h: k.h, type, hp: k.hp, vx: (i % 2 ? 1 : -1) * k.speed * (.85 + rnd(i) * .3), vy: 0, dead: 0, step: i, t: i * 17, flash: 0, shot: -1, idx: i };
 }
+function addDeco(x0, x1, seed) {
+  for (let x = Math.max(1, x0); x < Math.min(x1, COLS - 1); x++) {
+    const r = surface(x); if (r < 3 || map[r][x] !== "#" || map[r - 1][x] !== " " || map[r - 2][x] === "#") continue;
+    if (map[r][x - 1] === "^" || map[r][x + 1] === "^" || map[r - 1][x - 1] === "^" || map[r - 1][x + 1] === "^" || map[r - 1][x - 1] === "x" || map[r - 1][x + 1] === "x") continue;
+    const q = rnd(x * 3.1 + seed * 13); if (q < .36) deco.push([x, r - 1, TH.deco[Math.floor(rnd(x + seed) * TH.deco.length)]]);
+  }
+}
 function loadLevel(i) {
+  endless = false;
   const keep = player ? Math.max(player.tier, player.want) : 0, keepShield = !!player?.shield; // el modo bestia y el escudo pasan al nivel siguiente
   levelIdx = i; L = LEVELS[i]; TH = THEMES[L.theme]; cache = {};
   for (const row of map) row.fill(" ");
@@ -149,12 +157,7 @@ function loadLevel(i) {
   items = [];
   for (let y = 0; y < ROWS; y++) for (let x = 0; x < COLS; x++) if (map[y][x] === "c") items.push({ x: x * T + 4, y: y * T + 4, w: 8, h: 8, got: false });
   totalBrains = items.length + map.reduce((n, row) => n + row.filter((c) => c === "?").length, 0); gotBrains = 0; levelTime = 0; damaged = false;
-  deco = [];
-  for (let x = 4; x < goalX - 3; x++) {
-    const r = surface(x); if (r < 3 || map[r][x] !== "#" || map[r - 1][x] !== " " || map[r - 2][x] === "#") continue;
-    if (map[r][x - 1] === "^" || map[r][x + 1] === "^" || map[r - 1][x - 1] === "^" || map[r - 1][x + 1] === "^" || map[r - 1][x - 1] === "x" || map[r - 1][x + 1] === "x") continue;
-    const q = rnd(x * 3.1 + i * 13); if (q < .36) deco.push([x, r - 1, TH.deco[Math.floor(rnd(x + i) * TH.deco.length)]]);
-  }
+  deco = []; addDeco(4, goalX - 3, i);
   parts = []; shots = []; cam = 0; shake = 0; msg = ""; msgT = 0; banner = 160; bossDead = false; arenaLocked = false; levelStart = score;
   if (i + 1 > unlocked) { unlocked = i + 1; try { localStorage.setItem("zombilandia-nivel", unlocked); } catch {} }
 }
@@ -231,7 +234,62 @@ function drawShop() {
   if (shopMsgT) { g.fillStyle = "#f2c94c"; g.fillText(shopMsg, W / 2, 218); }
   g.fillStyle = "#cfc8e8"; g.fillText("◀ ▶ elegí · ▲ o tocá para comprar", W / 2, 234); g.textAlign = "left";
 }
-function newGame(i) { runId = Date.now(); upgrades = {}; player = null; score = 0; lives = 3; brains = 0; loadLevel(i); mode = "play"; }
+// ---------- Modo infinito ----------
+// Tramos armados a mano que se encadenan al azar y se ponen más difíciles. Cuando avanzás, el mundo se corre
+// 100 columnas hacia atrás y se genera lo que sigue, así nunca se termina.
+const ENDLESS = { name: "Modo infinito" }, ENDLESS_THEMES = ["cemetery", "city", "swamp", "lair"];
+let endless = false, distOff = 0, genX = 0, endBest = 0;
+try { endBest = +localStorage.getItem("zombilandia-infinito") || 0; } catch {}
+const meters = () => Math.max(0, Math.floor(distOff + player.x / T) - 2);
+function spawnAt(col, type) {
+  const r = surface(col), k = ZT[type], x = col * T + (T - k.w) / 2, n = distOff + col;
+  if (type === "bat") { const z = makeZombie(x, (r > 0 ? r - 5 : 8) * T, type, n); z.bx = z.x; z.by = z.y; z.off = 0; zombies.push(z); }
+  else if (r > 0 && map[r - 1][col] === " ") zombies.push(makeZombie(x, r * T - k.h, type, n));
+}
+function genChunk(x) {
+  const d = Math.min(1, (distOff + x) / 2500), rr = Math.random, len = 10 + Math.floor(rr() * 6), kind = Math.floor(rr() * 7);
+  fill(x, x + len - 1, 13, 14, "#");
+  if (kind === 0) arc(x + 2, 10, len - 4);
+  else if (kind === 1) { const gw = 2 + Math.floor(rr() * (2 + d * 2)); fill(x + 4, x + 3 + gw, 13, 14, rr() > .5 ? "~" : " "); arc(x + 3, 10, gw + 2); }
+  else if (kind === 2) { plat(x + 3, 10, 3); plat(x + 7, 8, 3, rr() > .5 ? "?" : "="); coins(x + 7, 7, 3); }
+  else if (kind === 3) { const sw = 3 + Math.floor(d * 2); fill(x + 4, x + 3 + sw, 12, 12, "x"); arc(x + 3, 9, sw + 2); }
+  else if (kind === 4) { set(x + 3, 12, "^"); fill(x + 6, x + 8, 9, 12, "#"); plat(x + 6, 6, 4); coins(x + 6, 5, 4); }
+  else if (kind === 5) { plat(x + 2, 10, 4, rr() > .5 ? "F" : "="); coins(x + 2, 9, 4); plat(x + 8, 9, 3); }
+  else { fill(x + 3, x + 5, 12, 12, "#"); set(x + 4, 11, "#"); coins(x + 3, 10, 3); }
+  if (rr() < .07) set(x + len - 3, 9, rr() > .5 ? "S" : "O");
+  const pool = ["walker", "walker", "runner", "jumper", "bat", "spitter", "shielder", "brute"].slice(0, 3 + Math.floor(d * 5));
+  const n = 1 + Math.floor(rr() * (1 + d * 3));
+  for (let k = 0; k < n; k++) spawnAt(x + 1 + Math.floor(rr() * (len - 2)), pool[Math.floor(rr() * pool.length)]);
+  return len;
+}
+function generate() {
+  while (genX + 16 <= COLS) {
+    const x0 = genX; genX += genChunk(genX);
+    for (let y = 0; y < ROWS; y++) for (let x = x0; x < genX; x++) if (map[y][x] === "c") items.push({ x: x * T + 4, y: y * T + 4, w: 8, h: 8, got: false });
+    addDeco(x0, genX, distOff);
+  }
+}
+function startEndless() {
+  loadLevel(0);
+  endless = true; L = ENDLESS; levelIdx = 5; TH = THEMES.cemetery; cache = {}; distOff = 0; arena = null; goalX = 1e9;
+  for (const row of map) row.fill(" ");
+  zombies = []; items = []; movers = []; deco = []; fill(0, 19, 13, 14, "#"); genX = 20; generate(); addDeco(4, 19, 0);
+  banner = 160; levelStart = 0;
+}
+function shiftWorld() {
+  const S = 100, dx = S * T;
+  for (const row of map) { row.splice(0, S); for (let k = 0; k < S; k++) row.push(" "); }
+  distOff += S; genX -= S; cam -= dx;
+  const p = player; p.x -= dx; p.safe.x -= dx; p.onMover = null;
+  zombies = zombies.filter((z) => { z.x -= dx; if (z.bx !== undefined) z.bx -= dx; return z.x > -80; });
+  items = items.filter((it) => (it.x -= dx) > -20); shots = []; for (const q of parts) q.x -= dx;
+  movers = []; falling = []; regrow = []; crumble = {};
+  deco = deco.map(([x, y, k]) => [x - S, y, k]).filter((q) => q[0] >= 0);
+  const th = THEMES[ENDLESS_THEMES[Math.floor(distOff / 400) % ENDLESS_THEMES.length]];
+  if (th !== TH) { TH = th; cache = {}; say(`${meters()} metros: ¡cambia el mundo!`); }
+  generate();
+}
+function newGame(i) { runId = Date.now(); upgrades = {}; player = null; score = 0; lives = 3; brains = 0; if (i === 5) startEndless(); else loadLevel(i); mode = "play"; }
 loadLevel(0);
 
 function collideX(o) {
@@ -388,7 +446,7 @@ function shrink(to = 0) {
   const p = player; if (p.tier > to) setTier(to);
   Object.assign(p, { want: to, growing: false, power: to > 0 ? 1 : 0 }); beep(500, .3, "triangle", 150);
 }
-function gameOver() { mode = "over"; player.dead = 1; beep(200, .6, "sawtooth", 40); recordScore(); }
+function gameOver() { if (endless && meters() > endBest) { endBest = meters(); try { localStorage.setItem("zombilandia-infinito", endBest); } catch {} } mode = "over"; player.dead = 1; beep(200, .6, "sawtooth", 40); recordScore(); }
 function hurt(src) {
   if (player.inv <= 0 && !player.dead) vibe(70);
   const p = player; if (p.inv > 0 || p.dead) return;
@@ -595,6 +653,7 @@ function update() {
   }
   for (const q of parts) { q.x += q.vx; q.y += q.vy; q.vy += .15; q.life--; }
   parts = parts.filter((q) => q.life > 0);
+  if (endless && p.x > 140 * T) shiftWorld();
   cam = Math.max(0, Math.min(COLS * T - W, p.x - W / 2 + 20));
   if (shake) shake--;
   if (msgT) msgT--;
@@ -1053,8 +1112,11 @@ function hud() {
   if (player.shield) { g.strokeStyle = "#bfefff"; g.lineWidth = 1; g.beginPath(); g.arc(8 + n * 9 + 4, 8, 3.5, 0, 7); g.stroke(); n++; }
   const bx = 8 + n * 9 + 6; R(bx, 5, 7, 5, "#e57fa0"); R(bx + 3, 5, 1, 5, "#b04a6a"); text(String(brains), bx + 10, 3);
   text(String(score).padStart(5, "0"), W / 2 - 12, 3, "#f2c94c");
-  text("N" + (levelIdx + 1), W - 72, 3, "#cfc8e8");
-  const pct = Math.min(1, player.x / (goalX * T)); R(W - 52, 6, 40, 4, "#2e2152"); R(W - 52, 6, Math.round(40 * pct), 4, "#7cc456"); R(W - 10, 3, 1, 9, "#cfc8e8"); R(W - 9, 3, 5, 4, "#d6453d");
+  if (endless) { g.textAlign = "right"; text(`${meters()} m`, W - 8, 3, "#7cc456"); g.textAlign = "left"; }
+  else {
+    text("N" + (levelIdx + 1), W - 72, 3, "#cfc8e8");
+    const pct = Math.min(1, player.x / (goalX * T)); R(W - 52, 6, 40, 4, "#2e2152"); R(W - 52, 6, Math.round(40 * pct), 4, "#7cc456"); R(W - 10, 3, 1, 9, "#cfc8e8"); R(W - 9, 3, 5, 4, "#d6453d");
+  }
   text(clock(levelTime), W - 40, 15, levelTime / 60 > PAR[levelIdx] ? "#ff8a7a" : "#cfc8e8");
   text("RAYO", 8, 15, "#7ff5ff"); R(36, 18, 40, 4, "#1d3a4a"); R(36, 18, Math.round(40 * (1 - player.cd / 40)), 4, player.cd ? "#3fd9ff" : "#bff8ff");
   if (player.power > 0) text(Math.max(player.tier, player.want) === 2 ? "BESTIA x2" : "BESTIA", 84, 15, Math.sin(time * .15) > 0 ? "#ffb03a" : "#ff7a1a");
@@ -1067,7 +1129,7 @@ function hud() {
   if (msgT) { g.textAlign = "center"; text(msg, W / 2, 60, "#f2c94c"); g.textAlign = "left"; }
   if (banner && mode === "play") {
     const a = Math.min(1, banner / 30, (160 - banner) / 20); g.globalAlpha = a * .7; R(0, 88, W, 50, "#07051a"); g.globalAlpha = a;
-    g.textAlign = "center"; g.font = "10px ui-monospace, monospace"; text(`NIVEL ${levelIdx + 1} DE ${LEVELS.length}`, W / 2, 95, "#cfc8e8");
+    g.textAlign = "center"; g.font = "10px ui-monospace, monospace"; text(endless ? `RÉCORD: ${endBest} METROS` : `NIVEL ${levelIdx + 1} DE ${LEVELS.length}`, W / 2, 95, "#cfc8e8");
     g.font = "bold 16px ui-monospace, monospace"; text(L.name.toUpperCase(), W / 2, 111, levelIdx === 4 ? "#ff6a4a" : "#7cc456");
     g.globalAlpha = 1; g.textAlign = "left";
   }
@@ -1079,25 +1141,28 @@ function panel(title, sub, c) {
   g.fillStyle = "#f3efe6"; g.font = "11px ui-monospace, monospace";
   sub.forEach((s, i) => g.fillText(s, W / 2, 108 + i * 17)); g.textAlign = "left";
 }
-const titleBoxes = () => LEVELS.map((_, i) => ({ x: Math.round(W / 2 - 116 + i * 48), y: 86, w: 40, h: 40 }));
+const titleBoxes = () => [...LEVELS, ENDLESS].map((_, i) => ({ x: Math.round(W / 2 - 140 + i * 48), y: 86, w: 40, h: 40 }));
+const titleOpen = (i) => i === 5 || i < unlocked;
 function drawTitle() {
   g.fillStyle = "rgba(7,5,26,.82)"; g.fillRect(0, 0, W, H);
   g.textAlign = "center"; g.textBaseline = "alphabetic"; g.font = "bold 30px ui-monospace, monospace";
   g.fillStyle = "#000"; g.fillText("ZOMBILANDIA", W / 2 + 2, 52); g.shadowColor = "#7cc456"; g.shadowBlur = 14; g.fillStyle = "#7cc456"; g.fillText("ZOMBILANDIA", W / 2, 50); g.shadowBlur = 0;
   g.font = "11px ui-monospace, monospace"; g.fillStyle = "#cfc8e8"; g.fillText("Saltá, disparale y llegá a la bandera.", W / 2, 70);
   titleBoxes().forEach((b, i) => {
-    const open = i < unlocked, on = i === sel, best = bests[i];
+    const open = titleOpen(i), on = i === sel, best = bests[i];
     R(b.x, b.y, b.w, b.h, on ? "#3b2f60" : "#1d1730"); g.strokeStyle = on ? "#f2c94c" : open ? "#4a3e6b" : "#2a2240"; g.lineWidth = on ? 2 : 1; g.strokeRect(b.x + .5, b.y + .5, b.w - 1, b.h - 1);
-    g.font = "bold 16px ui-monospace, monospace"; g.fillStyle = open ? (i === 4 ? "#ff6a4a" : "#f3efe6") : "#4a3e6b"; g.fillText(open ? String(i + 1) : "×", b.x + b.w / 2, b.y + 22);
-    if (open) for (let k = 0; k < 3; k++) star(b.x + 6 + k * 10, b.y + 29, best && best.st > k);
+    g.font = "bold 16px ui-monospace, monospace"; g.fillStyle = open ? (i === 4 ? "#ff6a4a" : "#f3efe6") : "#4a3e6b"; g.fillText(i === 5 ? "∞" : open ? String(i + 1) : "×", b.x + b.w / 2, b.y + 22);
+    if (open && i < 5) for (let k = 0; k < 3; k++) star(b.x + 6 + k * 10, b.y + 29, best && best.st > k);
+    if (i === 5) { g.font = "9px ui-monospace, monospace"; g.fillStyle = "#7cc456"; g.fillText(endBest ? `${endBest}m` : "nuevo", b.x + b.w / 2, b.y + 35); }
   });
-  const L0 = LEVELS[sel], best = bests[sel];
+  const L0 = sel === 5 ? ENDLESS : LEVELS[sel], best = bests[sel];
   g.font = "bold 12px ui-monospace, monospace"; g.fillStyle = sel === 4 ? "#ff6a4a" : "#7cc456"; g.fillText(L0.name, W / 2, 146);
   g.font = "11px ui-monospace, monospace"; g.fillStyle = "#cfc8e8";
-  g.fillText(best ? `Mejor: ${best.st} de 3 estrellas · ${clock(best.t)} (meta ${clock(PAR[sel] * 60)})` : `Tiempo meta ${clock(PAR[sel] * 60)}`, W / 2, 162);
+  if (sel === 5) g.fillText(`Corré todo lo que puedas · récord ${endBest} m`, W / 2, 162);
+  else g.fillText(best ? `Mejor: ${best.st} de 3 estrellas · ${clock(best.t)} (meta ${clock(PAR[sel] * 60)})` : `Tiempo meta ${clock(PAR[sel] * 60)}`, W / 2, 162);
   if (records[0]) { g.fillStyle = "#f2c94c"; g.fillText(`Récord: ${records[0].n} ${records[0].s}`, W / 2, 180); }
   g.fillStyle = hero === 1 ? "#9ad0ff" : "#7ff5ff"; g.font = "bold 11px ui-monospace, monospace"; g.fillText(`${HEROES[hero].name} · ${HEROES[hero].power}`, W / 2, 196); g.font = "11px ui-monospace, monospace";
-  g.fillStyle = "#f3efe6"; g.fillText(unlocked > 1 ? "◀ ▶ nivel · ⚡ personaje · ▲ jugar" : "⚡ cambiar personaje · ▲ o tocá para jugar", W / 2, 214);
+  g.fillStyle = "#f3efe6"; g.fillText("◀ ▶ nivel · ⚡ personaje · ▲ jugar", W / 2, 214);
   g.textAlign = "left";
 }
 function draw() {
@@ -1129,6 +1194,7 @@ function draw() {
     panel("¡NIVEL SUPERADO!", [L.name, `${lastStars[0] ? "✓" : "✗"} Tiempo ${clock(levelTime)} (meta ${clock(PAR[levelIdx] * 60)})`, `${lastStars[1] ? "✓" : "✗"} Cerebros ${gotBrains} de ${totalBrains}`, `${lastStars[2] ? "✓" : "✗"} ${damaged ? "Recibiste golpes" : "Sin golpes"}`, `Puntos: ${score}`, "Tocá para seguir"], "#f2c94c");
     for (let k = 0; k < 3; k++) { g.save(); g.translate(W / 2 - 34 + k * 24, 84); g.scale(2, 2); star(0, 0, lastStars[k]); g.restore(); }
   }
+  else if (mode === "over" && endless) panel("TE COMIERON", [`Llegaste a ${meters()} metros · ${score} puntos`, `Récord del modo infinito: ${endBest} metros`, ...recLines(3), "", "Tocá para correr de nuevo"], "#ff5a5a");
   else if (mode === "over") panel("TE COMIERON", [`Nivel ${levelIdx + 1}: ${L.name}  ·  ${score} puntos`, ...recLines(3), "", bossCheck && bossCheck.level === levelIdx ? "Tocá para volver a pelear con el jefe" : "Tocá para reintentar el nivel"], "#ff5a5a");
   else if (mode === "won") panel("¡SOBREVIVISTE!", [`Derrotaste al Rey Zombi · ${score} puntos`, "", ...recLines(5), "Tocá para volver"], "#f2c94c");
 }
@@ -1146,7 +1212,7 @@ requestAnimationFrame(frame);
 function press(k) { // empezar, seguir o reintentar
   if (naming) return true;
   if (mode === "title") {
-    if (k === "left" || k === "right") { sel = Math.max(0, Math.min(unlocked - 1, sel + (k === "left" ? -1 : 1))); beep(660, .05, "square"); return true; }
+    if (k === "left" || k === "right") { const av = [...Array(unlocked).keys(), 5], j = av.indexOf(sel); sel = av[Math.max(0, Math.min(av.length - 1, (j < 0 ? 0 : j) + (k === "left" ? -1 : 1)))]; beep(660, .05, "square"); return true; }
     if (k === "fire") { setHero(1 - hero); beep(hero ? 1500 : 900, .12, "triangle", hero ? 2400 : 1400); return true; }
     newGame(urlLevel ? urlLevel - 1 : sel); return true;
   }
@@ -1157,7 +1223,7 @@ function press(k) { // empezar, seguir o reintentar
       zombies = zombies.filter(isBoss); banner = 0;
       const rx = (arena.wall + 4) * T, ry = surface(arena.wall + 4) * T - 16;
       Object.assign(player, { x: rx, y: ry, safe: { x: rx, y: ry } }); lockArena(); say(`¡Revancha con ${BOSS_NAME[zombies[0].type]}!`);
-    } else { score = levelStart; loadLevel(levelIdx); }
+    } else if (endless) { newGame(5); return true; } else { score = levelStart; loadLevel(levelIdx); }
     mode = "play"; return true;
   }
   if (mode === "clear") { bossCheck = null; mode = "shop"; shopSel = 0; shopMsgT = 0; return true; }
@@ -1177,7 +1243,7 @@ addEventListener("keydown", (e) => {
   if (mode === "title" && (e.key === "c" || e.key === "C")) { setHero(1 - hero); return; }
   if (mode === "shop" && (e.key === "ArrowDown" || e.key === "s" || e.key === "S")) { shopSel = (shopSel + 1) % SHOP.length; return; }
   if (mode === "shop" && e.key === "ArrowUp") { shopSel = (shopSel - 1 + SHOP.length) % SHOP.length; return; }
-  if (mode === "title" && /^[1-5]$/.test(e.key) && +e.key <= unlocked) { newGame(+e.key - 1); return; } // elegir nivel ya desbloqueado
+  if (mode === "title" && /^[1-6]$/.test(e.key) && (+e.key <= unlocked || e.key === "6")) { newGame(+e.key - 1); return; } // elegir nivel ya desbloqueado
   if (press(k)) { e.preventDefault(); return; }
   if (k) { keys[k] = true; if (k in tap) tap[k] = true; e.preventDefault(); }
 });
@@ -1193,7 +1259,7 @@ cv.addEventListener("pointerdown", (e) => {
   if (mode === "title" && !naming) { // tocar un nivel lo elige y arranca
     const r = cv.getBoundingClientRect(), x = (e.clientX - r.left) / r.width * W, y = (e.clientY - r.top) / r.height * H;
     const i = titleBoxes().findIndex((b) => x >= b.x && x <= b.x + b.w && y >= b.y && y <= b.y + b.h);
-    if (i >= 0 && i < unlocked) sel = i; else if (i >= unlocked) return;
+    if (i >= 0 && titleOpen(i)) sel = i; else if (i >= 0) return;
   }
   press(null);
 });
