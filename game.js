@@ -1,7 +1,7 @@
 "use strict";
 // Zombilandia: platformer de zombies en canvas, sin librerías. Personajes y arte propios (rects de píxel).
 // 5 niveles: cementerio, ciudad en ruinas, pantano tóxico, laboratorio y la guarida del Rey Zombi (jefe final).
-const VERSION = "v58"; // subir en cada publicación (también en index.html)
+const VERSION = "v59"; // subir en cada publicación (también en index.html)
 // ---------- Métricas de uso (Umami, anónimas, sin cookies) ----------
 // Pegá acá el "Website ID" de tu sitio en Umami; vacío = no se manda nada. Respeta "No rastrear" del navegador y solo cuenta en el sitio publicado.
 const UMAMI = { id: "4c40559c-a7e6-4a1f-8fb1-6d289f3ffbcb", src: "https://cloud.umami.is/script.js", domains: "ccontarino.github.io" };
@@ -646,6 +646,13 @@ function updateZombie(z) {
     if (z.y > ROWS * T + 30 || touching(z, "~", 4)) { z.dead = 1; }
     return;
   }
+  z.engaged = 0; if (z.pv === undefined) z.pv = z.vx; z.chasing = 0; // persecución: sin temblar en el lugar, y sin empujarse contra bordes o paredes
+  const chase = (v) => {
+    const s = Math.sign(dx); z.engaged = 1;
+    if (Math.abs(dx) < 5) { z.vx = 0; return; } // justo debajo/encima del jugador: se queda quieto en vez de girar cada cuadro
+    if (z.blockDir && s === z.blockDir) { z.vx = 0; return; } // el camino hacia el jugador está cortado: espera
+    z.blockDir = 0; z.vx = s * v; z.chasing = 1;
+  };
   if (z.type === "exploder") {
     if (z.fuse) {
       z.vx = 0; if (z.fuse % 8 === 0) beep(900 + (45 - z.fuse) * 12, .05, "square", 0);
@@ -656,9 +663,9 @@ function updateZombie(z) {
         return;
       }
     } else if (Math.abs(dx) < 26 && Math.abs(p.y - z.y) < 30) { z.fuse = 45; beep(1200, .08, "square", 0); }
-    else if (Math.abs(dx) < 170 && Math.abs(p.y - z.y) < 40) z.vx = (Math.sign(dx) || 1) * 1.1;
+    else if (Math.abs(dx) < 170 && Math.abs(p.y - z.y) < 40) chase(1.1);
   }
-  if (z.type === "runner" && Math.abs(dx) < 150 && Math.abs(p.y - z.y) < 40) z.vx = (Math.sign(dx) || 1) * 1.3;
+  if (z.type === "runner" && Math.abs(dx) < 150 && Math.abs(p.y - z.y) < 40) chase(1.3);
   if (z.type === "jumper" && z.ground && z.t % 90 === 0) { z.vy = -4.8; z.vx = Math.abs(dx) < 160 ? Math.sign(dx) * .8 : z.vx; }
   if (z.type === "bat") { // vuela: no usa gravedad ni choca con el piso
     const near = Math.abs(dx) < 150 && p.y > z.by - 30;
@@ -670,7 +677,7 @@ function updateZombie(z) {
   if (z.type === "spitter" && Math.abs(dx) < 230 && z.t % 120 === 0) {
     shots.push({ x: z.x + 6, y: z.y + 5, vx: Math.max(-3.2, Math.min(3.2, dx / 55)), vy: -3.6, g: .15, r: 3, col: "#b6f03a", life: 240 }); beep(240, .15, "sawtooth", 120);
   }
-  if (z.type === "shielder" && Math.abs(dx) < 170 && z.ground) z.vx = (Math.sign(dx) || 1) * .45;
+  if (z.type === "shielder" && Math.abs(dx) < 170 && z.ground) chase(.45);
   if (boss && z.type !== "boss") bossAI(z, p, dx);
   if (z.type === "boss") {
     const sp = z.hp < 6 ? .95 : .55;
@@ -678,11 +685,12 @@ function updateZombie(z) {
     if (z.ground && z.t % 140 === 0) z.vy = -6.2;
     if (z.t % 230 === 0 && zombies.filter((m) => m.minion && !m.dead).length < 3) { const m = makeZombie(z.x + 8, z.y, "walker", z.t); m.minion = true; zombies.push(m); beep(120, .3, "sawtooth", 60); }
   }
+  if (!z.vx && z.pv && !z.engaged && !z.fuse && z.ground && !boss) z.vx = z.pv; // fuera de alcance: vuelve a patrullar
   z.vy = Math.min(z.vy + 0.28, 7);
   const before = z.x; collideX(z);
   if (!boss && z.ground) {
     const ahead = Math.floor((z.vx > 0 ? z.x + z.w + 1 : z.x - 1) / T), under = Math.floor((z.y + z.h + 2) / T);
-    if (z.x === before && z.vx || !solid(ahead, under)) { z.vx = -z.vx; z.x = before; }
+    if (z.x === before && z.vx || !solid(ahead, under)) { z.x = before; if (z.chasing) { z.blockDir = Math.sign(z.vx); z.vx = 0; } else { z.vx = -z.vx; z.pv = z.vx; } }
   } else if (z.x === before && z.vx) z.vx = -z.vx;
   const vyb = z.vy; collideY(z); z.step += .08 * Math.abs(z.vx) / .4;
   if (boss && z.ground && !z.wasG && vyb > 3) { shake = 12; vibe(90); burst(z.x + z.w / 2, z.y + z.h, "#8a6a60", 12); if (z.type === "toad") for (const v of [-2.2, 0, 2.2]) shots.push({ x: z.x + 15, y: z.y + 4, vx: v, vy: -3.4, g: .15, r: 4, col: "#b6f03a", life: 200 }); beep(70, .3, "sawtooth", 40); }
