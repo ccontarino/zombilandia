@@ -1,10 +1,10 @@
 "use strict";
 // Zombilandia: platformer de zombies en canvas, sin librerías. Personajes y arte propios (rects de píxel).
 // 5 niveles: cementerio, ciudad en ruinas, pantano tóxico, laboratorio y la guarida del Rey Zombi (jefe final).
-const VERSION = "v50"; // subir en cada publicación (también en index.html)
+const VERSION = "v51"; // subir en cada publicación (también en index.html)
 // ---------- Métricas de uso (Umami, anónimas, sin cookies) ----------
 // Pegá acá el "Website ID" de tu sitio en Umami; vacío = no se manda nada. Respeta "No rastrear" del navegador y solo cuenta en el sitio publicado.
-const UMAMI = { id: "", src: "https://cloud.umami.is/script.js", domains: "ccontarino.github.io" };
+const UMAMI = { id: "4c40559c-a7e6-4a1f-8fb1-6d289f3ffbcb", src: "https://cloud.umami.is/script.js", domains: "ccontarino.github.io" };
 if (UMAMI.id) { const s = document.createElement("script"); s.defer = true; s.src = UMAMI.src; s.dataset.websiteId = UMAMI.id; s.dataset.domains = UMAMI.domains; s.dataset.doNotTrack = "true"; document.head.appendChild(s); }
 const track = (name, data) => { try { if (window.umami && net.role !== "guest") window.umami.track(name, data); } catch {} };
 const T = 16, H = 240, ROWS = 15, COLS = 215;
