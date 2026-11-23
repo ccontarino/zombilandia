@@ -1,7 +1,7 @@
 "use strict";
 // Zombilandia: platformer de zombies en canvas, sin librerías. Personajes y arte propios (rects de píxel).
 // 5 niveles: cementerio, ciudad en ruinas, pantano tóxico, laboratorio y la guarida del Rey Zombi (jefe final).
-const VERSION = "v27"; // subir en cada publicación (también en index.html)
+const VERSION = "v28"; // subir en cada publicación (también en index.html)
 const T = 16, H = 240, ROWS = 15, COLS = 215;
 let W = 480, cache = {};
 const cv = document.getElementById("c"), g = cv.getContext("2d");
@@ -132,7 +132,7 @@ let arena = null, bossCheck = null; // punto de control en la arena del jefe: si
 let mode = "title", levelIdx = 0, L, TH, goalX = 184, levelStart = 0, banner = 0, bossDead = false, arenaLocked = false, deco = [];
 let movers = [], crumble = {}, falling = [], regrow = [], shots = [], player, zombies, items, parts, cam = 0, score = 0, lives = 3, brains = 0, time = 0, msg = "", msgT = 0, shake = 0, unlocked = 1;
 try { unlocked = Math.max(1, Math.min(LEVELS.length, +localStorage.getItem("zombilandia-nivel") || 1)); } catch {}
-const urlLevel = Math.max(1, Math.min(LEVELS.length, +new URLSearchParams(location.search).get("nivel") || 0)) || 0;
+const urlLevel = (() => { const n = +new URLSearchParams(location.search).get("nivel") || 0; return n ? Math.max(1, Math.min(LEVELS.length, n)) : 0; })();
 if (urlLevel) unlocked = Math.max(unlocked, urlLevel);
 
 let zuid = 0;
