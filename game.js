@@ -36,12 +36,12 @@ const goalX = 184;
 const zombieSpawns = [18, 27, 40, 47, 60, 66, 85, 90, 104, 110, 115, 128, 134, 148, 152, 158, 166, 170];
 
 // ---------- Estado ----------
-const keys = { left: false, right: false, jump: false };
+const keys = { left: false, right: false, jump: false, fire: false };
 let state, player, zombies, items, parts, cam, score, lives, brains, time, over, won, msg, msgT, shake, started = false;
 
 function resetLevel(full) {
   if (full) { score = 0; lives = 3; brains = 0; }
-  player = { x: 40, y: 150, vx: 0, vy: 0, w: 10, h: 14, face: 1, ground: false, coyote: 0, inv: 0, dead: 0, step: 0 };
+  player = { x: 40, y: 150, vx: 0, vy: 0, w: 10, h: 14, face: 1, ground: false, coyote: 0, jumps: 0, cd: 0, beam: 0, beamDir: 1, ray: null, firePrev: false, inv: 0, dead: 0, step: 0 };
   zombies = zombieSpawns.map((x, i) => ({ x: x * T, y: 12 * T - 14, w: 12, h: 14, vx: (i % 2 ? 0.35 : -0.35) * (1 + (i % 3) * 0.2), dead: 0, step: i }));
   items = [];
   for (let y = 0; y < ROWS; y++) for (let x = 0; x < COLS; x++) if (map[y][x] === "c") items.push({ x: x * T + 4, y: y * T + 4, w: 8, h: 8, got: false });
@@ -108,11 +108,26 @@ function update() {
   if (keys.left) { p.vx -= acc; p.face = -1; } else if (keys.right) { p.vx += acc; p.face = 1; } else p.vx *= p.ground ? 0.78 : 0.95;
   p.vx = Math.max(-max, Math.min(max, p.vx));
   p.coyote = p.ground ? 6 : p.coyote - 1;
-  if (keys.jump && p.coyote > 0 && !p.jumped) { p.vy = -5.1; p.jumped = true; p.coyote = 0; beep(330, .12, "square", 660); }
+  if (p.ground) p.jumps = 0; else if (p.coyote <= 0 && p.jumps === 0) p.jumps = 1; // si se cae de un borde, queda el salto de aire
+  if (keys.jump && !p.jumped) {
+    if (p.coyote > 0) { p.vy = -5.1; p.jumped = true; p.coyote = 0; p.jumps = 1; beep(330, .12, "square", 660); }
+    else if (p.jumps < 2) { p.vy = -4.9; p.jumped = true; p.jumps = 2; burst(p.x + 5, p.y + 14, "#9ad7ff", 8); beep(520, .12, "square", 980); } // doble salto
+  }
   if (!keys.jump) { p.jumped = false; if (p.vy < -2) p.vy += 0.35; } // salto variable
   p.vy = Math.min(p.vy + 0.28, 6);
   collideX(p); collideY(p);
   if (p.x < 0) p.x = 0;
+  // rayo láser de ojos: se dispara al apretar, con recarga
+  if (p.cd > 0) p.cd--;
+  if (keys.fire && !p.firePrev && p.cd <= 0) { p.beam = 14; p.cd = 40; p.beamDir = p.face; shake = 3; beep(140, .25, "sawtooth", 900); }
+  p.firePrev = keys.fire;
+  if (p.beam > 0) {
+    p.beam--;
+    const d = p.beamDir, x0 = d > 0 ? p.x + p.w : p.x, y = p.y + 4; let len = 0;
+    while (len < 150 && !solid(Math.floor((x0 + d * len) / T), Math.floor(y / T))) len += 2;
+    p.ray = { x: d > 0 ? x0 : x0 - len, y: y - 1, w: len, h: 3 };
+    for (const z of zombies) if (!z.dead && hit(p.ray, z)) { z.dead = 1; score += 50; burst(z.x + 6, z.y + 6, "#ff6b5a", 10); beep(200, .12, "square", 70); }
+  } else p.ray = null;
   if (p.ground && Math.abs(p.vx) > .3) p.step += Math.abs(p.vx) * .12;
   if (p.inv > 0) p.inv--;
   if (p.y > ROWS * T + 20) { lives--; beep(150, .4, "sawtooth", 50); if (lives <= 0) over = true; else { const x = Math.max(40, Math.floor((p.x - 80) / T) * T); safeRespawn(x); } }
@@ -197,7 +212,7 @@ function drawPlayer() {
   const x = Math.round(p.x - cam) - 1, y = Math.round(p.y), f = p.face, s = Math.sin(p.step * 3) > 0, air = !p.ground;
   R(x + 2, y, 8, 3, "#2f7fd6"); R(x + (f > 0 ? 6 : 0), y + 2, 6, 2, "#2f7fd6"); // gorra
   R(x + 2, y + 3, 8, 4, "#f0c8a0");           // cara
-  R(x + (f > 0 ? 7 : 3), y + 4, 2, 2, "#222"); // ojo
+  R(x + (f > 0 ? 7 : 3), y + 4, 2, 2, p.beam > 0 ? "#ff3b30" : "#222"); // ojo (rojo al disparar)
   R(x + 1, y + 7, 10, 4, "#d6453d");           // remera
   R(x + (f > 0 ? 9 : -1), y + 7, 3, 3, "#f0c8a0");
   R(x + 2, y + 11, 3, air ? 3 : s ? 2 : 3, "#2a2a55"); R(x + 7, y + 11, 3, air ? 3 : s ? 3 : 2, "#2a2a55");
@@ -206,6 +221,7 @@ function hud() {
   g.font = "bold 10px ui-monospace, monospace"; g.textBaseline = "top";
   const t = (s, x, y, c = "#f3efe6") => { g.fillStyle = "#000"; g.fillText(s, x + 1, y + 1); g.fillStyle = c; g.fillText(s, x, y); };
   t("♥".repeat(Math.max(0, lives)), 8, 6, "#e0524a"); t("🧠 " + brains, 60, 6); t(String(score).padStart(5, "0"), 110, 6);
+  t("⚡", 8, 20, "#ff6b5a"); R(22, 23, 40, 5, "#3a2a4a"); R(22, 23, Math.round(40 * (1 - player.cd / 40)), 5, "#ff6b5a");
   const pct = Math.min(100, Math.floor(player.x / (goalX * T) * 100)); t(pct + "%", W - 34, 6);
   if (msgT) { g.textAlign = "center"; t(msg, W / 2, 40, "#f2c94c"); g.textAlign = "left"; }
 }
@@ -221,9 +237,14 @@ function draw() {
   drawBg(); drawTiles(); drawItems();
   zombies.forEach((z) => { if (z.x - cam > -20 && z.x - cam < W + 20) drawZombie(z); });
   drawPlayer();
+  if (player.ray && player.beam > 0) { // rayo: halo, núcleo y brillo
+    const r = player.ray, x = r.x - Math.floor(cam), fl = player.beam % 2;
+    g.globalAlpha = .45; R(x, r.y - 2, r.w, 7, "#ff3b30"); g.globalAlpha = 1;
+    R(x, r.y, r.w, 3, fl ? "#ff6b5a" : "#ff3b30"); R(x, r.y + 1, r.w, 1, "#fff");
+  }
   for (const q of parts) R(q.x - cam, q.y, 2, 2, q.col);
   hud(); g.restore();
-  if (!started) panel("ZOMBILANDIA", ["Saltales encima a los zombis,", "juntá cerebros y llegá a la bandera.", "", "Tocá o apretá una tecla para empezar"], "#7fbf5a");
+  if (!started) panel("ZOMBILANDIA", ["Saltales encima a los zombis o quemalos con el rayo.", "Doble salto: tocá saltar de nuevo en el aire.", "Juntá cerebros y llegá a la bandera.", "", "Tocá o apretá una tecla para empezar"], "#7fbf5a");
   else if (over) panel("TE COMIERON", [`Puntos: ${score}`, "Tocá o apretá una tecla para reintentar"], "#d6453d");
   else if (won) panel("¡SOBREVIVISTE!", [`Puntos: ${score}  ·  Cerebros: ${brains}`, "Tocá o apretá una tecla para jugar de nuevo"], "#f2c94c");
 }
@@ -243,7 +264,7 @@ function press() { // empezar / reintentar
   if (over || won) { resetLevel(true); return true; }
   return false;
 }
-const map_k = { ArrowLeft: "left", a: "left", A: "left", ArrowRight: "right", d: "right", D: "right", ArrowUp: "jump", w: "jump", W: "jump", " ": "jump" };
+const map_k = { ArrowLeft: "left", a: "left", A: "left", ArrowRight: "right", d: "right", D: "right", ArrowUp: "jump", w: "jump", W: "jump", " ": "jump", x: "fire", X: "fire", f: "fire", F: "fire", j: "fire", J: "fire", Shift: "fire", z: "fire", Z: "fire" };
 addEventListener("keydown", (e) => { const k = map_k[e.key]; if (e.repeat) { if (k) e.preventDefault(); return; } if (press()) return; if (k) { keys[k] = true; e.preventDefault(); } });
 addEventListener("keyup", (e) => { const k = map_k[e.key]; if (k) keys[k] = false; });
 addEventListener("blur", () => { keys.left = keys.right = keys.jump = false; });
