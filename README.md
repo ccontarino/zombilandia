@@ -20,6 +20,7 @@ Platformer de zombies para el navegador, hecho con canvas y sin librerías. Pers
 - **Jefes:** cada nivel termina en una arena con su jefe y punto de control: el Enterrador (tira lápidas), el Bombero zombi (chorros de fuego), la Rana tóxica (saltos y burbujas de ácido), el Doctor zombi (vidrio protector que hay que romper y clones) y el Rey Zombi.
 - **Personajes:** en el inicio, con ⚡ (o la tecla C), elegís entre Chispa (rayo de plasma) y Escarcha, cuyo rayo congela a los zombis: congelados no lastiman y sirven de plataforma; un segundo disparo los rompe.
 - **Modo infinito:** la casilla ∞ del inicio arranca un nivel que no termina nunca: se arma solo, cambia de mundo cada 400 metros y se pone más difícil. Guarda tu récord de metros.
+- **Editor de niveles:** con ✎ (o la tecla E en el inicio) dibujás tu propio nivel tocando la grilla: suelo, plataformas, bloques, pinches, resortes, líquidos, agua y zombis. Lo probás al instante y lo compartís con un link: el nivel viaja comprimido dentro de la dirección, sin servidor.
 - **Progreso:** el juego recuerda hasta qué nivel llegaste; en la pantalla de inicio tocá ⚡ (o apretá el número del nivel) para seguir desde ahí.
 - **Reglas:** saltale encima a los zombis para eliminarlos, juntá cerebros (son la moneda de la tienda), abrí los bloques `?` pegándoles desde abajo y llegá a la bandera.
 

@@ -1,7 +1,7 @@
 "use strict";
 // Zombilandia: platformer de zombies en canvas, sin librerías. Personajes y arte propios (rects de píxel).
 // 5 niveles: cementerio, ciudad en ruinas, pantano tóxico, laboratorio y la guarida del Rey Zombi (jefe final).
-const VERSION = "v21"; // subir en cada publicación (también en index.html)
+const VERSION = "v22"; // subir en cada publicación (también en index.html)
 const T = 16, H = 240, ROWS = 15, COLS = 215;
 let W = 480, cache = {};
 const cv = document.getElementById("c"), g = cv.getContext("2d");
@@ -142,7 +142,8 @@ function addDeco(x0, x1, seed) {
 function loadLevel(i) {
   endless = false;
   const keep = player ? Math.max(player.tier, player.want) : 0, keepShield = !!player?.shield; // el modo bestia y el escudo pasan al nivel siguiente
-  levelIdx = i; L = LEVELS[i]; TH = THEMES[L.theme]; cache = {};
+  const custom = typeof i === "object"; // un nivel hecho en el editor
+  levelIdx = custom ? 6 : i; L = custom ? i : LEVELS[i]; TH = THEMES[L.theme]; cache = {};
   for (const row of map) row.fill(" ");
   const info = L.build(); goalX = info.goal; arena = info.arena;
   movers = (info.movers || []).map(([c, r, w, dx, dy, sp], k) => ({ x0: c * T, y0: r * T, x: c * T, y: r * T, w: w * T, h: 8, dx: dx * T, dy: dy * T, sp, t: k * 1.7, vx: 0, vy: 0 }));
@@ -157,9 +158,9 @@ function loadLevel(i) {
   items = [];
   for (let y = 0; y < ROWS; y++) for (let x = 0; x < COLS; x++) if (map[y][x] === "c") items.push({ x: x * T + 4, y: y * T + 4, w: 8, h: 8, got: false });
   totalBrains = items.length + map.reduce((n, row) => n + row.filter((c) => c === "?").length, 0); gotBrains = 0; levelTime = 0; damaged = false;
-  deco = []; addDeco(4, goalX - 3, i);
+  deco = []; addDeco(4, goalX - 3, levelIdx);
   parts = []; shots = []; cam = 0; shake = 0; msg = ""; msgT = 0; banner = 160; bossDead = false; arenaLocked = false; levelStart = score;
-  if (i + 1 > unlocked) { unlocked = i + 1; try { localStorage.setItem("zombilandia-nivel", unlocked); } catch {} }
+  if (!custom && i + 1 > unlocked) { unlocked = i + 1; try { localStorage.setItem("zombilandia-nivel", unlocked); } catch {} }
 }
 function lockArena() { arenaLocked = true; fill(arena.wall, arena.wall + 1, 2, surface(arena.wall) - 1, "#"); shake = 20; beep(90, .8, "sawtooth", 40); }
 // ---------- Récords ----------
@@ -549,6 +550,7 @@ function update() {
   time++;
   if (banner) banner--;
   if (shopMsgT) shopMsgT--;
+  if (mode === "edit") { edCam = Math.max(0, Math.min(EDW * T - W + 32, edCam + (keys.right ? 5 : 0) - (keys.left ? 5 : 0))); return; }
   if (mode !== "play") return;
   levelTime++;
   for (const m of movers) { // plataformas móviles: van y vienen
@@ -647,8 +649,8 @@ function update() {
   for (const it of items) if (!it.got && hit(p, it) && it.kind === "shield") { it.got = true; p.shield = true; say("¡Escudo!"); beep(440, .3, "triangle", 880); vibe(40); }
   for (const it of items) if (!it.got && hit(p, it)) { it.got = true; brains++; gotBrains++; score += 10; beep(880, .08, "triangle", 1320); }
   if (p.x > goalX * T && (!arena || bossDead)) {
-    score += lives * 100 + 500; fanfare(); finishLevel();
-    mode = levelIdx === LEVELS.length - 1 ? "won" : "clear";
+    score += lives * 100 + 500; fanfare();
+    if (L.custom) { mode = "cwin"; recordScore(); } else { finishLevel(); mode = levelIdx === LEVELS.length - 1 ? "won" : "clear"; }
     if (mode === "won") recordScore();
   }
   for (const q of parts) { q.x += q.vx; q.y += q.vy; q.vy += .15; q.life--; }
@@ -1165,7 +1167,99 @@ function drawTitle() {
   g.fillStyle = "#f3efe6"; g.fillText("◀ ▶ nivel · ⚡ personaje · ▲ jugar", W / 2, 214);
   g.textAlign = "left";
 }
+// ---------- Editor de niveles ----------
+// Se dibuja sobre una grilla de 120 columnas, se prueba al instante y se comparte por link:
+// el nivel viaja comprimido dentro de la dirección (#nivel=...), sin servidor.
+const EDW = 120, ED_TILES = " #=?SOcx^F~W";
+const TOOLS = [
+  { k: "#", n: "Suelo" }, { k: "=", n: "Plataforma" }, { k: "?", n: "Bloque ?" }, { k: "c", n: "Cerebro" }, { k: "S", n: "Jeringa" }, { k: "O", n: "Escudo" },
+  { k: "x", n: "Pinches" }, { k: "^", n: "Resorte" }, { k: "F", n: "Se cae" }, { k: "~", n: "Líquido" }, { k: "W", n: "Agua" },
+  { z: "walker", n: "Zombi" }, { z: "runner", n: "Corredor" }, { z: "jumper", n: "Saltarín" }, { z: "brute", n: "Grandote" }, { z: "bat", n: "Murciélago" },
+  { z: "spitter", n: "Escupidor" }, { z: "shielder", n: "Escudero" }, { k: " ", n: "Borrar" },
+];
+const blankLevel = () => ({ theme: "cemetery", rows: Array.from({ length: ROWS }, (_, y) => (y >= 13 ? "#" : " ").repeat(EDW)), spawns: {} });
+let edData = blankLevel(), edTool = 0, edCam = 0, painting = false, shared = null, customFrom = "editor";
+try { const s = JSON.parse(localStorage.getItem("zombilandia-editor") || "null"); if (s && s.rows?.length === ROWS) edData = s; } catch {}
+function saveEd() { edData.rows = map.map((r) => r.slice(0, EDW).join("")); try { localStorage.setItem("zombilandia-editor", JSON.stringify(edData)); } catch {} }
+function CUSTOM(d) {
+  return { name: "Tu nivel", theme: d.theme, custom: true, data: d, build() {
+    d.rows.forEach((row, y) => { for (let x = 0; x < EDW; x++) map[y][x] = ED_TILES.includes(row[x]) ? row[x] : " "; });
+    fill(EDW, COLS - 1, 13, 14, "#");
+    return { goal: EDW - 4, spawns: Object.entries(d.spawns).map(([c, t]) => [+c, t]).filter(([c, t]) => ZT[t] && !ZT[t].boss) };
+  } };
+}
+function runCustom(d, from) { customFrom = from; runId = Date.now(); upgrades = {}; player = null; score = 0; lives = 3; brains = 0; bossCheck = null; loadLevel(CUSTOM(d)); mode = "play"; showEd(false); }
+function enterEditor(d) {
+  if (d !== edData) { edData = JSON.parse(JSON.stringify(d)); }
+  mode = "edit"; L = { name: "Editor", theme: edData.theme }; TH = THEMES[edData.theme]; cache = {};
+  for (const row of map) row.fill(" ");
+  edData.rows.forEach((row, y) => { for (let x = 0; x < EDW; x++) map[y][x] = row[x] || " "; });
+  zombies = []; items = []; deco = []; movers = []; shots = []; parts = []; arena = null; goalX = EDW - 4; edCam = Math.min(edCam, EDW * T); banner = 0; msgT = 0;
+  saveEd(); showEd(true);
+}
+function showEd(on) {
+  document.body.classList.toggle("editing", on);
+  if (on) document.querySelectorAll("#edTools button").forEach((b, i) => b.classList.toggle("on", i === edTool));
+  const th = document.getElementById("edTheme"); if (th) th.textContent = "Tema: " + { cemetery: "cementerio", city: "ciudad", swamp: "pantano", lab: "laboratorio", lair: "guarida" }[edData.theme];
+}
+function edPaint(e, first) {
+  const r = cv.getBoundingClientRect(), x = (e.clientX - r.left) / r.width * W + edCam, y = (e.clientY - r.top) / r.height * H;
+  const col = Math.floor(x / T), row = Math.floor(y / T), t = TOOLS[edTool];
+  if (col < 0 || col >= EDW || row < 2 || row >= ROWS) return;
+  if (t.z) { if (first) { if (edData.spawns[col] === t.z) delete edData.spawns[col]; else edData.spawns[col] = t.z; beep(500, .05, "square"); } }
+  else { if (map[row][col] !== t.k) { map[row][col] = t.k; if (t.k === " " && first) delete edData.spawns[col]; } }
+  saveEd();
+}
+function drawEditor() {
+  cam = edCam; drawBg(); drawTiles();
+  const ox = Math.floor(cam);
+  for (let y = 0; y < ROWS; y++) for (let x = 0; x < EDW; x++) if (map[y][x] === "c") { const px = x * T - ox + 4, py = y * T + 4; R(px, py + 1, 8, 5, "#e57fa0"); R(px + 1, py, 6, 8, "#e57fa0"); R(px + 4, py + 1, 1, 5, "#b04a6a"); }
+  drawWater();
+  for (const [c, type] of Object.entries(edData.spawns)) { // zombis de muestra
+    const k = ZT[type]; if (!k) continue; const r = surface(+c), z = makeZombie(+c * T + (T - k.w) / 2, type === "bat" ? ((r > 0 ? r : 13) - 5) * T : (r > 0 ? r : 13) * T - k.h, type, +c); z.ground = true; drawZombie(z, +c);
+  }
+  g.globalAlpha = .12; for (let x = Math.floor(cam / T); x * T - ox < W; x++) R(x * T - ox, 32, 1, H - 32, "#ffffff"); for (let y = 2; y < ROWS; y++) R(0, y * T, W, 1, "#ffffff"); g.globalAlpha = 1;
+  g.globalAlpha = .4; R(EDW * T - ox, 0, W, H, "#000"); g.globalAlpha = 1;
+  const sx = 2 * T - ox; R(sx, 13 * T - 16, 10, 14, "#1f7a7a"); R(sx + 4, 13 * T - 13, 5, 4, "#f0c8a0"); // dónde arranca el héroe
+  g.globalAlpha = .85; R(0, 0, W, 30, "#07051a"); g.globalAlpha = 1;
+  g.font = "bold 11px ui-monospace, monospace"; g.textBaseline = "top"; g.textAlign = "left";
+  text(`EDITOR · ${TOOLS[edTool].n}`, 8, 5, "#f2c94c"); g.font = "10px ui-monospace, monospace"; text(`columna ${Math.floor((edCam + W / 2) / T)} de ${EDW} · ◀ ▶ mover`, 8, 18, "#cfc8e8");
+}
+async function packLevel(d) {
+  const json = JSON.stringify({ v: 1, t: d.theme, r: d.rows, s: d.spawns });
+  const buf = await new Response(new Blob([json]).stream().pipeThrough(new CompressionStream("deflate-raw"))).arrayBuffer();
+  let b = ""; new Uint8Array(buf).forEach((c) => { b += String.fromCharCode(c); });
+  return btoa(b).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+}
+async function unpackLevel(s) {
+  const bin = atob(s.replace(/-/g, "+").replace(/_/g, "/")), bytes = Uint8Array.from(bin, (c) => c.charCodeAt(0));
+  const o = JSON.parse(await new Response(new Blob([bytes]).stream().pipeThrough(new DecompressionStream("deflate-raw"))).text());
+  if (!THEMES[o.t] || !Array.isArray(o.r) || o.r.length !== ROWS) throw new Error("nivel inválido");
+  const rows = o.r.map((r) => [...String(r).slice(0, EDW).padEnd(EDW, " ")].map((c) => (ED_TILES.includes(c) ? c : " ")).join(""));
+  const spawns = {}; for (const [c, t] of Object.entries(o.s || {})) if (ZT[t] && !ZT[t].boss && +c >= 0 && +c < EDW) spawns[+c] = t;
+  return { theme: o.t, rows, spawns };
+}
+async function shareLevel() {
+  saveEd();
+  const link = location.origin + location.pathname + "#nivel=" + (await packLevel(edData));
+  const box = document.getElementById("sh"), inp = document.getElementById("shIn");
+  inp.value = link; box.hidden = false; naming = true;
+  document.getElementById("shCopy").onclick = async () => { try { await navigator.clipboard.writeText(link); document.getElementById("shCopy").textContent = "¡Copiado!"; } catch { inp.select(); } };
+  const nb = document.getElementById("shShare"); nb.hidden = !navigator.share; nb.onclick = () => navigator.share({ title: "Mi nivel de Zombilandia", url: link }).catch(() => {});
+  document.getElementById("shClose").onclick = () => { box.hidden = true; document.getElementById("shCopy").textContent = "Copiar"; setTimeout(() => { naming = false; }, 200); };
+}
+function buildEdUI() {
+  const tools = document.getElementById("edTools"); if (!tools) return;
+  TOOLS.forEach((t, i) => { const b = document.createElement("button"); b.textContent = t.n; b.onclick = () => { edTool = i; showEd(true); }; tools.appendChild(b); });
+  document.getElementById("edTheme").onclick = () => { const ks = Object.keys(THEMES); edData.theme = ks[(ks.indexOf(edData.theme) + 1) % ks.length]; saveEd(); enterEditor(edData); };
+  document.getElementById("edPlay").onclick = () => { saveEd(); runCustom(edData, "editor"); };
+  document.getElementById("edShare").onclick = () => shareLevel();
+  document.getElementById("edClear").onclick = () => { if (confirm("¿Borrar todo el nivel?")) { edData = blankLevel(); enterEditor(edData); } };
+  document.getElementById("edExit").onclick = () => { saveEd(); showEd(false); mode = "title"; loadLevel(0); };
+  const eb = document.getElementById("edit"); if (eb) eb.onclick = () => { if (mode === "title") enterEditor(edData); };
+}
 function draw() {
+  if (mode === "edit") { drawEditor(); return; }
   g.save();
   if (shake) g.translate(Math.round((Math.random() - .5) * 4), Math.round((Math.random() - .5) * 4));
   drawBg(); drawTiles(); drawItems();
@@ -1196,6 +1290,8 @@ function draw() {
   }
   else if (mode === "over" && endless) panel("TE COMIERON", [`Llegaste a ${meters()} metros · ${score} puntos`, `Récord del modo infinito: ${endBest} metros`, ...recLines(3), "", "Tocá para correr de nuevo"], "#ff5a5a");
   else if (mode === "over") panel("TE COMIERON", [`Nivel ${levelIdx + 1}: ${L.name}  ·  ${score} puntos`, ...recLines(3), "", bossCheck && bossCheck.level === levelIdx ? "Tocá para volver a pelear con el jefe" : "Tocá para reintentar el nivel"], "#ff5a5a");
+  else if (mode === "cwin") panel("¡LO PASASTE!", [`Tu nivel en ${clock(levelTime)} · ${score} puntos`, "", customFrom === "link" ? "Tocá para abrirlo en el editor" : "Tocá para volver al editor"], "#f2c94c");
+  else if (mode === "linkintro") panel("NIVEL COMPARTIDO", ["Alguien te mandó un nivel hecho", "en el editor de Zombilandia.", "", "Tocá para jugarlo"], "#7cc456");
   else if (mode === "won") panel("¡SOBREVIVISTE!", [`Derrotaste al Rey Zombi · ${score} puntos`, "", ...recLines(5), "Tocá para volver"], "#f2c94c");
 }
 
@@ -1223,7 +1319,7 @@ function press(k) { // empezar, seguir o reintentar
       zombies = zombies.filter(isBoss); banner = 0;
       const rx = (arena.wall + 4) * T, ry = surface(arena.wall + 4) * T - 16;
       Object.assign(player, { x: rx, y: ry, safe: { x: rx, y: ry } }); lockArena(); say(`¡Revancha con ${BOSS_NAME[zombies[0].type]}!`);
-    } else if (endless) { newGame(5); return true; } else { score = levelStart; loadLevel(levelIdx); }
+    } else if (endless) { newGame(5); return true; } else if (L.custom) { runCustom(L.data, customFrom); return true; } else { score = levelStart; loadLevel(levelIdx); }
     mode = "play"; return true;
   }
   if (mode === "clear") { bossCheck = null; mode = "shop"; shopSel = 0; shopMsgT = 0; return true; }
@@ -1232,6 +1328,9 @@ function press(k) { // empezar, seguir o reintentar
     shopAct(shopSel); return true;
   }
   if (mode === "won") { mode = "title"; loadLevel(0); return true; }
+  if (mode === "cwin") { enterEditor(L.data); return true; }
+  if (mode === "linkintro") { runCustom(shared, "link"); return true; }
+  if (mode === "edit") return false; // en el editor, ◀ ▶ mueven la vista
   return false;
 }
 const map_k = { ArrowLeft: "left", a: "left", A: "left", ArrowRight: "right", d: "right", D: "right", ArrowUp: "jump", w: "jump", W: "jump", " ": "jump", x: "fire", X: "fire", f: "fire", F: "fire", j: "fire", J: "fire", Shift: "fire", z: "fire", Z: "fire" };
@@ -1241,6 +1340,7 @@ addEventListener("keydown", (e) => {
   audioInit();
   if (e.key === "m" || e.key === "M") { toggleMusic(); return; }
   if (mode === "title" && (e.key === "c" || e.key === "C")) { setHero(1 - hero); return; }
+  if (mode === "title" && (e.key === "e" || e.key === "E")) { enterEditor(edData); return; }
   if (mode === "shop" && (e.key === "ArrowDown" || e.key === "s" || e.key === "S")) { shopSel = (shopSel + 1) % SHOP.length; return; }
   if (mode === "shop" && e.key === "ArrowUp") { shopSel = (shopSel - 1 + SHOP.length) % SHOP.length; return; }
   if (mode === "title" && /^[1-6]$/.test(e.key) && (+e.key <= unlocked || e.key === "6")) { newGame(+e.key - 1); return; } // elegir nivel ya desbloqueado
@@ -1249,7 +1349,10 @@ addEventListener("keydown", (e) => {
 });
 addEventListener("keyup", (e) => { const k = map_k[e.key]; if (k) keys[k] = false; });
 addEventListener("blur", () => { keys.left = keys.right = keys.jump = keys.fire = false; });
+cv.addEventListener("pointermove", (e) => { if (mode === "edit" && painting) edPaint(e, false); });
+addEventListener("pointerup", () => { painting = false; });
 cv.addEventListener("pointerdown", (e) => {
+  if (mode === "edit") { painting = true; cv.setPointerCapture?.(e.pointerId); edPaint(e, true); return; }
   audioInit();
   if (mode === "shop") { // tocar un renglón lo compra
     const r = cv.getBoundingClientRect(), x = (e.clientX - r.left) / r.width * W, y = (e.clientY - r.top) / r.height * H;
@@ -1272,6 +1375,8 @@ document.querySelectorAll("#pad button").forEach((b) => {
   b.addEventListener("pointerdown", on); b.addEventListener("pointerup", off); b.addEventListener("pointercancel", off); b.addEventListener("lostpointercapture", off);
   b.addEventListener("contextmenu", (e) => e.preventDefault());
 });
+buildEdUI();
+if (location.hash.startsWith("#nivel=")) unpackLevel(location.hash.slice(7)).then((d) => { shared = d; loadLevel(CUSTOM(d)); mode = "linkintro"; }).catch(() => {});
 window.__game = {
   get state() { return { mode, level: levelIdx + 1, lives, score, brains, x: player.x, y: player.y, bossDead, arenaLocked, big: player.tier, power: player.power, w: player.w, h: player.h }; }, keys,
   debug: { load(i) { newGame(i); }, tp(col) { const r = surface(col); Object.assign(player, { x: col * T, y: (r > 0 ? r : 10) * T - 16, vx: 0, vy: 0 }); }, god() { lives = 99; }, die() { lives = 1; loseLife(); }, power() { powerUp(); }, peace() { zombies.length = 0; }, get boss() { const z = zombies.find(isBoss); return z && { x: z.x, hp: z.hp, dead: z.dead }; } },
