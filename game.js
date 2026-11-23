@@ -1,7 +1,7 @@
 "use strict";
 // Zombilandia: platformer de zombies en canvas, sin librerías. Personajes y arte propios (rects de píxel).
 // 5 niveles: cementerio, ciudad en ruinas, pantano tóxico, laboratorio y la guarida del Rey Zombi (jefe final).
-const VERSION = "v15"; // subir en cada publicación (también en index.html)
+const VERSION = "v16"; // subir en cada publicación (también en index.html)
 const T = 16, H = 240, ROWS = 15, COLS = 190;
 let W = 480, cache = {};
 const cv = document.getElementById("c"), g = cv.getContext("2d");
@@ -177,7 +177,40 @@ function finishLevel() {
   try { localStorage.setItem("zombilandia-estrellas", JSON.stringify(bests)); } catch {}
 }
 function star(x, y, on) { const c = on ? "#f2c94c" : "#3a2f50"; R(x + 3, y, 1, 2, c); R(x, y + 2, 7, 1, c); R(x + 1, y + 3, 5, 1, c); R(x + 2, y + 4, 3, 1, c); R(x + 1, y + 5, 2, 1, c); R(x + 4, y + 5, 2, 1, c); }
-function newGame(i) { runId = Date.now(); player = null; score = 0; lives = 3; brains = 0; loadLevel(i); mode = "play"; }
+// ---------- Tienda ----------
+// Entre niveles: los cerebros son la moneda.
+let upgrades = {}, shopSel = 0, shopMsg = "", shopMsgT = 0;
+const SHOP = [
+  { name: "Vida extra", price: 30, ok: () => lives < 9, buy: () => { lives++; } },
+  { name: "Escudo", price: 25, ok: () => !player.shield, buy: () => { player.shield = true; } },
+  { name: "Jeringa (modo bestia)", price: 50, ok: () => Math.max(player.tier, player.want) < 2, buy: () => { player.want = Math.min(2, Math.max(player.tier, player.want) + 1); } },
+  { name: "Rayo largo, para siempre", price: 80, ok: () => !upgrades.longRay, buy: () => { upgrades.longRay = true; } },
+  { name: "Seguir al próximo nivel", price: 0 },
+];
+function shopAct(i) {
+  const it = SHOP[i];
+  if (!it.price) { loadLevel(levelIdx + 1); mode = "play"; return; }
+  if (!it.ok()) { shopMsg = "Ya lo tenés"; beep(160, .12, "square"); }
+  else if (brains < it.price) { shopMsg = `Te faltan ${it.price - brains} cerebros`; beep(160, .12, "square"); }
+  else { brains -= it.price; it.buy(); shopMsg = `¡Compraste: ${it.name}!`; [660, 880, 1320].forEach((f, k) => beep(f, .08, "triangle", 0, k * .06)); vibe(30); }
+  shopMsgT = 120;
+}
+const shopRow = (i) => ({ x: 24, y: 78 + i * 25, w: W - 48, h: 22 });
+function drawShop() {
+  g.fillStyle = "rgba(7,5,26,.9)"; g.fillRect(0, 0, W, H);
+  g.textAlign = "center"; g.textBaseline = "alphabetic"; g.font = "bold 22px ui-monospace, monospace"; g.fillStyle = "#f2c94c"; g.fillText("TIENDA", W / 2, 40);
+  g.font = "11px ui-monospace, monospace"; g.fillStyle = "#cfc8e8"; g.fillText(`Tenés ${brains} cerebros para gastar`, W / 2, 60);
+  SHOP.forEach((it, i) => {
+    const r = shopRow(i), on = i === shopSel, can = !it.price || (it.ok() && brains >= it.price);
+    R(r.x, r.y, r.w, r.h, on ? "#3b2f60" : "#1d1730"); g.strokeStyle = on ? "#f2c94c" : "#2e2152"; g.lineWidth = 1; g.strokeRect(r.x + .5, r.y + .5, r.w - 1, r.h - 1);
+    g.textAlign = "left"; g.font = `${on ? "bold " : ""}11px ui-monospace, monospace`; g.fillStyle = !it.price ? "#7cc456" : can ? "#f3efe6" : "#6d6496"; g.fillText(it.name, r.x + 8, r.y + 15);
+    if (it.price) { g.textAlign = "right"; g.fillStyle = can ? "#f2c94c" : "#6d6496"; g.fillText(it.ok() ? `${it.price}` : "listo", r.x + r.w - 20, r.y + 15); R(r.x + r.w - 15, r.y + 7, 7, 5, can ? "#e57fa0" : "#4a3e6b"); }
+  });
+  g.textAlign = "center"; g.font = "11px ui-monospace, monospace";
+  if (shopMsgT) { g.fillStyle = "#f2c94c"; g.fillText(shopMsg, W / 2, 218); }
+  g.fillStyle = "#cfc8e8"; g.fillText("◀ ▶ elegí · ▲ o tocá para comprar", W / 2, 234); g.textAlign = "left";
+}
+function newGame(i) { runId = Date.now(); upgrades = {}; player = null; score = 0; lives = 3; brains = 0; loadLevel(i); mode = "play"; }
 loadLevel(0);
 
 function collideX(o) {
@@ -391,6 +424,7 @@ function updateZombie(z, p) {
 function update() {
   time++;
   if (banner) banner--;
+  if (shopMsgT) shopMsgT--;
   if (mode !== "play") return;
   levelTime++;
   const p = player, acc = (p.ground ? 0.35 : 0.22) * TIER.acc[p.tier], max = TIER.max[p.tier];
@@ -422,7 +456,7 @@ function update() {
   p.firePrev = keys.fire; tap.fire = false;
   if (p.beam > 0) {
     p.beam--;
-    const d = p.beamDir, x0 = d > 0 ? p.x + p.w : p.x, y = p.y + TIER.eye[p.tier], reach = TIER.reach[p.beamTier], th = TIER.th[p.beamTier]; let len = 0;
+    const d = p.beamDir, x0 = d > 0 ? p.x + p.w : p.x, y = p.y + TIER.eye[p.tier], reach = TIER.reach[p.beamTier] + (upgrades.longRay ? 90 : 0), th = TIER.th[p.beamTier]; let len = 0;
     while (len < reach && !solid(Math.floor((x0 + d * len) / T), Math.floor(y / T))) len += 2;
     p.ray = { x: d > 0 ? x0 : x0 - len, y: y - (th >> 1), w: len, h: th };
     if (time % 2 === 0) burst(x0 + d * len, y, ["#bff8ff", "#ffd84a", "#ff9ae0"][p.beamTier], 2 + p.beamTier * 2);
@@ -442,7 +476,7 @@ function update() {
   if (mode !== "play") return;
   for (const it of items) if (!it.got && hit(p, it) && it.kind === "syringe") { it.got = true; powerUp(); }
   for (const it of items) if (!it.got && hit(p, it) && it.kind === "shield") { it.got = true; p.shield = true; say("¡Escudo!"); beep(440, .3, "triangle", 880); vibe(40); }
-  for (const it of items) if (!it.got && hit(p, it)) { it.got = true; brains++; gotBrains++; score += 10; beep(880, .08, "triangle", 1320); if (brains % 25 === 0) { lives++; say("¡Vida extra!"); } }
+  for (const it of items) if (!it.got && hit(p, it)) { it.got = true; brains++; gotBrains++; score += 10; beep(880, .08, "triangle", 1320); }
   if (p.x > goalX * T && (!L.boss || bossDead)) {
     score += lives * 100 + 500; fanfare(); finishLevel();
     mode = levelIdx === LEVELS.length - 1 ? "won" : "clear";
@@ -883,6 +917,7 @@ function draw() {
   g.font = "8px ui-monospace, monospace"; g.textAlign = "right"; g.textBaseline = "bottom"; g.globalAlpha = .6; text(VERSION, W - 3, H - 2, "#cfc8e8"); g.globalAlpha = 1; g.textAlign = "left";
   if (mode === "title") drawTitle();
   else if (mode === "__") panel("ZOMBILANDIA", ["Saltá sobre los zombis o usá el rayo.", "Doble salto: saltá otra vez en el aire.", "5 mundos y un jefe final.", records[0] ? `Récord: ${records[0].n} ${records[0].s}` : "", "Tocá o apretá una tecla para empezar", ...(unlocked > 1 ? [`o tocá ⚡ para seguir desde el nivel ${unlocked}`] : [])], "#7cc456");
+  else if (mode === "shop") drawShop();
   else if (mode === "clear") {
     panel("¡NIVEL SUPERADO!", [L.name, `${lastStars[0] ? "✓" : "✗"} Tiempo ${clock(levelTime)} (meta ${clock(PAR[levelIdx] * 60)})`, `${lastStars[1] ? "✓" : "✗"} Cerebros ${gotBrains} de ${totalBrains}`, `${lastStars[2] ? "✓" : "✗"} ${damaged ? "Recibiste golpes" : "Sin golpes"}`, `Puntos: ${score}`, "Tocá para seguir"], "#f2c94c");
     for (let k = 0; k < 3; k++) { g.save(); g.translate(W / 2 - 34 + k * 24, 84); g.scale(2, 2); star(0, 0, lastStars[k]); g.restore(); }
@@ -916,7 +951,11 @@ function press(k) { // empezar, seguir o reintentar
     } else { score = levelStart; loadLevel(levelIdx); }
     mode = "play"; return true;
   }
-  if (mode === "clear") { bossCheck = null; loadLevel(levelIdx + 1); mode = "play"; return true; }
+  if (mode === "clear") { bossCheck = null; mode = "shop"; shopSel = 0; shopMsgT = 0; return true; }
+  if (mode === "shop") {
+    if (k === "left" || k === "right") { shopSel = (shopSel + (k === "left" ? -1 : 1) + SHOP.length) % SHOP.length; beep(660, .04, "square"); return true; }
+    shopAct(shopSel); return true;
+  }
   if (mode === "won") { mode = "title"; loadLevel(0); return true; }
   return false;
 }
@@ -926,6 +965,8 @@ addEventListener("keydown", (e) => {
   const k = map_k[e.key]; if (e.repeat) { if (k) e.preventDefault(); return; }
   audioInit();
   if (e.key === "m" || e.key === "M") { toggleMusic(); return; }
+  if (mode === "shop" && (e.key === "ArrowDown" || e.key === "s" || e.key === "S")) { shopSel = (shopSel + 1) % SHOP.length; return; }
+  if (mode === "shop" && e.key === "ArrowUp") { shopSel = (shopSel - 1 + SHOP.length) % SHOP.length; return; }
   if (mode === "title" && /^[1-5]$/.test(e.key) && +e.key <= unlocked) { newGame(+e.key - 1); return; } // elegir nivel ya desbloqueado
   if (press(k)) { e.preventDefault(); return; }
   if (k) { keys[k] = true; if (k in tap) tap[k] = true; e.preventDefault(); }
@@ -934,6 +975,11 @@ addEventListener("keyup", (e) => { const k = map_k[e.key]; if (k) keys[k] = fals
 addEventListener("blur", () => { keys.left = keys.right = keys.jump = keys.fire = false; });
 cv.addEventListener("pointerdown", (e) => {
   audioInit();
+  if (mode === "shop") { // tocar un renglón lo compra
+    const r = cv.getBoundingClientRect(), x = (e.clientX - r.left) / r.width * W, y = (e.clientY - r.top) / r.height * H;
+    const i = SHOP.findIndex((_, j) => { const b = shopRow(j); return x >= b.x && x <= b.x + b.w && y >= b.y && y <= b.y + b.h; });
+    if (i >= 0) { shopSel = i; shopAct(i); } return;
+  }
   if (mode === "title" && !naming) { // tocar un nivel lo elige y arranca
     const r = cv.getBoundingClientRect(), x = (e.clientX - r.left) / r.width * W, y = (e.clientY - r.top) / r.height * H;
     const i = titleBoxes().findIndex((b) => x >= b.x && x <= b.x + b.w && y >= b.y && y <= b.y + b.h);
