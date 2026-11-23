@@ -1,7 +1,7 @@
 "use strict";
 // Zombilandia: platformer de zombies en canvas, sin librerías. Personajes y arte propios (rects de píxel).
 // 5 niveles: cementerio, ciudad en ruinas, pantano tóxico, laboratorio y la guarida del Rey Zombi (jefe final).
-const VERSION = "v57"; // subir en cada publicación (también en index.html)
+const VERSION = "v58"; // subir en cada publicación (también en index.html)
 // ---------- Métricas de uso (Umami, anónimas, sin cookies) ----------
 // Pegá acá el "Website ID" de tu sitio en Umami; vacío = no se manda nada. Respeta "No rastrear" del navegador y solo cuenta en el sitio publicado.
 const UMAMI = { id: "4c40559c-a7e6-4a1f-8fb1-6d289f3ffbcb", src: "https://cloud.umami.is/script.js", domains: "ccontarino.github.io" };
@@ -156,7 +156,7 @@ LEVELS.push(
     land(T); gaps(T);
     set(32, 12, "^"); set(50, 11, "^"); set(68, 12, "^"); set(84, 11, "^"); set(101, 12, "^"); set(118, 11, "^"); set(135, 12, "^");
     plat(30, 9, 3, "?"); plat(35, 6, 3); coins(35, 5, 3); plat(48, 7, 4); coins(48, 6, 4); plat(66, 9, 3, "?"); plat(70, 6, 3); coins(70, 5, 3); plat(82, 7, 4); coins(82, 6, 4); plat(100, 9, 3, "?"); plat(116, 7, 3); coins(116, 6, 3); plat(133, 6, 4); coins(133, 5, 4); plat(150, 9, 3, "?");
-    set(31, 9, "S"); set(67, 9, "O"); set(101, 9, "S"); set(151, 9, "S"); set(6, 12, "x"); set(60 + 10, 12, "x");
+    set(31, 9, "S"); set(67, 9, "O"); set(101, 9, "S"); set(151, 9, "S"); set(60 + 10, 12, "x");
     const mv = [[21, 12, 2, 4, 0, .02], [39, 12, 2, 4, 0, .02], [57, 11, 2, 4, 0, .022], [73, 11, 2, 4, 0, .02], [91, 12, 2, 4, 0, .022], [107, 11, 2, 4, 0, .02], [125, 12, 2, 4, 0, .024], [141, 12, 2, 4, 0, .02]];
     return { arena: { wall: 188, lock: 192 }, movers: mv, goal: 211, spawns: S("205X 6w 12r 18j 30w 35r 48j 54w 66r 70k 82w 86j 100r 104w 116j 120k 134w 150r 156j 162w 168k 174r 14v 50v 84v 118v 32s 110s 66e 136e") };
   } },
@@ -165,7 +165,7 @@ LEVELS.push(
     land(T); gaps(T);
     plat(15, 9, 3); coins(15, 8, 3); plat(30, 7, 3); coins(30, 6, 3); plat(55, 6, 3); coins(55, 5, 3); plat(72, 5, 3); coins(72, 4, 3); plat(85, 7, 3); plat(99, 5, 3); coins(99, 4, 3); plat(124, 7, 3); coins(124, 6, 3); plat(139, 8, 3);
     plat(24, 9, 3, "?"); plat(63, 6, 3, "?"); plat(91, 5, 3, "?"); plat(130, 8, 3, "?"); plat(166, 9, 3); plat(174, 9, 3, "?");
-    set(25, 9, "O"); set(64, 6, "S"); set(92, 5, "S"); set(131, 8, "O"); set(175, 9, "S"); set(38, 10, "x"); set(66, 9, "x"); set(106, 11, "x");
+    set(25, 9, "O"); set(64, 6, "S"); set(92, 5, "S"); set(131, 8, "O"); set(175, 9, "S");
     return { arena: { wall: 155, lock: 161 }, movers: [[43, 10, 2, 3, 0, .02], [112, 11, 2, 3, 0, .02]], goal: 186, spawns: S("178B 5w 10r 22j 26w 36r 40j 62w 66b 70r 78j 82w 92b 96r 105j 110w 118r 130b 134r 146j 150w 20v 64v 100v 126v 30s 98s 72k 114k 146e 38e") };
   } }
 );
