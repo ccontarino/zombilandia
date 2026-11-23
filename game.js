@@ -1,7 +1,7 @@
 "use strict";
 // Zombilandia: platformer de zombies en canvas, sin librerías. Personajes y arte propios (rects de píxel).
 // 5 niveles: cementerio, ciudad en ruinas, pantano tóxico, laboratorio y la guarida del Rey Zombi (jefe final).
-const VERSION = "v46"; // subir en cada publicación (también en index.html)
+const VERSION = "v47"; // subir en cada publicación (también en index.html)
 const T = 16, H = 240, ROWS = 15, COLS = 215;
 let W = 480, cache = {};
 const cv = document.getElementById("c"); let g = cv.getContext("2d"); const MAINCTX = g; let SC = 1;
@@ -91,9 +91,9 @@ const LEVELS = [
     }
     for (const [a, b] of [[44, 46], [60, 62], [100, 102], [136, 138]]) fill(a, b, 12, 12, "x");
     fill(80, 83, 9, 12, "#"); set(77, 12, "^"); fill(118, 121, 8, 12, "#"); set(116, 12, "^");
-    plat(26, 9, 4, "F"); coins(26, 8, 4); plat(58, 8, 3, "?"); plat(84, 6, 4); coins(84, 5, 4); plat(96, 9, 3, "?"); plat(122, 6, 3); coins(122, 5, 3); plat(138, 8, 4, "F"); coins(138, 7, 4);
-    plat(165, 9, 3); plat(176, 7, 3, "?");
-    set(59, 8, "S"); set(177, 7, "S"); set(97, 9, "O");
+    plat(26, 9, 4, "F"); coins(26, 8, 4); plat(58, 9, 3, "?"); plat(84, 6, 4); coins(84, 5, 4); plat(96, 9, 3, "?"); plat(122, 6, 3); coins(122, 5, 3); plat(138, 8, 4, "F"); coins(138, 7, 4);
+    plat(165, 9, 3); plat(176, 9, 3, "?");
+    set(59, 9, "S"); set(177, 9, "S"); set(97, 9, "O");
     return { arena: { wall: 155, lock: 161 }, movers: [[90, 10, 2, 4, 0, .02], [108, 10, 2, 5, 0, .018], [144, 9, 2, 5, 0, .022]], goal: 186, spawns: S("12w 25r 30j 42b 48r 59w 64j 75w 87r 98b 104j 124r 134b 141j 154r 178B 20v 50e 70v 133s 139e 146v") };
   } },
 ];
