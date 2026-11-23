@@ -1,7 +1,7 @@
 "use strict";
 // Zombilandia: platformer de zombies en canvas, sin librerías. Personajes y arte propios (rects de píxel).
 // 5 niveles: cementerio, ciudad en ruinas, pantano tóxico, laboratorio y la guarida del Rey Zombi (jefe final).
-const VERSION = "v39"; // subir en cada publicación (también en index.html)
+const VERSION = "v40"; // subir en cada publicación (también en index.html)
 const T = 16, H = 240, ROWS = 15, COLS = 215;
 let W = 480, cache = {};
 const cv = document.getElementById("c"); let g = cv.getContext("2d"); const MAINCTX = g; let SC = 1;
@@ -136,9 +136,15 @@ const urlLevel = (() => { const n = +new URLSearchParams(location.search).get("n
 if (urlLevel) unlocked = Math.max(unlocked, urlLevel);
 
 let zuid = 0;
+// ---------- Ajustes: dificultad, botones, gráficos ----------
+const CFG = { diff: 1, pad: 1, gfx: "auto" };
+try { Object.assign(CFG, JSON.parse(localStorage.getItem("zombilandia-ajustes") || "{}")); } catch {}
+const saveCfg = () => { try { localStorage.setItem("zombilandia-ajustes", JSON.stringify(CFG)); } catch {} };
+const DSP = [.8, 1, 1.25], DLIVES = [5, 3, 2];
+let paused = false, fxLvl = 2; // fxLvl: 2 todo, 1 sin bloom, 0 mínimo
 function makeZombie(x, y, type, i) {
   const k = ZT[type];
-  return { x, y, w: k.w, h: k.h, type, hp: k.hp, vx: (i % 2 ? 1 : -1) * k.speed * (.85 + rnd(i) * .3), vy: 0, dead: 0, step: i, t: i * 17, flash: 0, shot: -1, idx: i, uid: ++zuid };
+  return { x, y, w: k.w, h: k.h, type, hp: k.hp, vx: (i % 2 ? 1 : -1) * k.speed * DSP[CFG.diff] * (.85 + rnd(i) * .3), vy: 0, dead: 0, step: i, t: i * 17, flash: 0, shot: -1, idx: i, uid: ++zuid };
 }
 function addDeco(x0, x1, seed) {
   for (let x = Math.max(1, x0); x < Math.min(x1, COLS - 1); x++) {
@@ -302,7 +308,7 @@ function shiftWorld() {
   if (th !== TH) { TH = th; cache = {}; say(`${meters()} metros: ¡cambia el mundo!`); }
   generate();
 }
-function newGame(i) { runId = Date.now(); upgrades = {}; players = []; nPlayers = net.peer ? 2 : 1; score = 0; lives = 3; brains = 0; if (i === 5) startEndless(); else loadLevel(i); mode = "play"; }
+function newGame(i) { runId = Date.now(); upgrades = {}; players = []; nPlayers = net.peer ? 2 : 1; score = 0; lives = DLIVES[CFG.diff]; brains = 0; if (i === 5) startEndless(); else loadLevel(i); mode = "play"; }
 loadLevel(0);
 
 function collideX(o) {
@@ -1258,7 +1264,7 @@ function CUSTOM(d) {
     return { goal: EDW - 4, spawns: Object.entries(d.spawns).map(([c, t]) => [+c, t]).filter(([c, t]) => ZT[t] && !ZT[t].boss) };
   } };
 }
-function runCustom(d, from) { customFrom = from; runId = Date.now(); upgrades = {}; players = []; nPlayers = net.peer ? 2 : 1; score = 0; lives = 3; brains = 0; bossCheck = null; loadLevel(CUSTOM(d)); mode = "play"; showEd(false); }
+function runCustom(d, from) { customFrom = from; runId = Date.now(); upgrades = {}; players = []; nPlayers = net.peer ? 2 : 1; score = 0; lives = DLIVES[CFG.diff]; brains = 0; bossCheck = null; loadLevel(CUSTOM(d)); mode = "play"; showEd(false); }
 function enterEditor(d) {
   if (d !== edData) { edData = JSON.parse(JSON.stringify(d)); }
   mode = "edit"; L = { name: "Editor", theme: edData.theme }; TH = THEMES[edData.theme]; cache = {};
@@ -1405,7 +1411,7 @@ function draw() {
   player = players[me()] || players[0];
   g.save();
   if (shake) g.translate(Math.round((Math.random() - .5) * 4), Math.round((Math.random() - .5) * 4));
-  drawBgSoft(); godRays(); drawMotes(); drawTiles(); drawItems();
+  drawBgSoft(); if (fxLvl > 0) godRays(); if (fxLvl > 0) drawMotes(); drawTiles(); drawItems();
   for (const z of zombies) shadowOf(z); for (const q of players) shadowOf(q);
   for (const f of falling) drawPlat(f.x - cam, f.y, -9, 0, .3);
   for (const m of movers) { // plataformas móviles
@@ -1422,7 +1428,7 @@ function draw() {
     g.globalAlpha = .3; g.fillStyle = s.col; g.beginPath(); g.arc(x, s.y, s.r + 3, 0, 7); g.fill(); g.globalAlpha = 1; g.beginPath(); g.arc(x, s.y, s.r, 0, 7); g.fill(); R(x - 1, s.y - 2, 1, 1, "#f0ffc0"); }
   for (const q of players) { drawPlayer(q); drawShield(q); drawBeam(q); } drawWater();
   for (const q of parts) { const a = Math.min(1, q.life / 20); g.globalAlpha = a; g.fillStyle = q.col; g.beginPath(); g.arc(q.x - cam, q.y, 1 + a * .9, 0, 7); g.fill(); } g.globalAlpha = 1;
-  drawLights(); postFX();
+  if (fxLvl > 0) drawLights(); if (fxLvl > 1) postFX();
   g.fillStyle = grads().vig; g.fillRect(0, 0, W, H);
   hud(); g.restore();
   g.font = "8px ui-monospace, monospace"; g.textAlign = "right"; g.textBaseline = "bottom"; g.globalAlpha = .6; text(VERSION, W - 3, H - 2, "#cfc8e8"); g.globalAlpha = 1; g.textAlign = "left";
@@ -1443,9 +1449,15 @@ function draw() {
 
 // ---------- Bucle (60 fps fijos) ----------
 let last = performance.now(), acc = 0;
+let perfEma = 16.7, perfBad = 0;
 function frame(now) {
-  acc += Math.min(100, now - last); last = now;
-  while (acc >= 1000 / 60) { if (!net.paused && net.role !== "guest") update(); net.step(); acc -= 1000 / 60; }
+  const dt = now - last; acc += Math.min(100, dt); last = now;
+  if (CFG.gfx === "auto") { // si el celu se traba, bajo los efectos de a poco
+    perfEma += (Math.min(100, dt) - perfEma) * .05;
+    if (perfEma > 27 && fxLvl > 0 && ++perfBad > 120) { fxLvl--; perfBad = 0; perfEma = 16.7; }
+    if (perfEma <= 27) perfBad = 0;
+  } else fxLvl = CFG.gfx === "alto" ? 2 : 0;
+  while (acc >= 1000 / 60) { if (!net.paused && !paused && net.role !== "guest") update(); net.step(); acc -= 1000 / 60; }
   g.setTransform(SC, 0, 0, SC, 0, 0); draw(); musicTick(); requestAnimationFrame(frame);
 }
 requestAnimationFrame(frame);
@@ -1466,7 +1478,7 @@ function press(k) { // empezar, seguir o reintentar
     newGame(urlLevel ? urlLevel - 1 : sel); return true;
   }
   if (mode === "over") {
-    lives = 3;
+    lives = DLIVES[CFG.diff];
     if (bossCheck && bossCheck.level === levelIdx) { // revancha: arranca en la arena, frente al jefe
       score = bossCheck.score; brains = bossCheck.brains; loadLevel(levelIdx);
       zombies = zombies.filter(isBoss); banner = 0;
@@ -1488,6 +1500,7 @@ function press(k) { // empezar, seguir o reintentar
 }
 const map_k = { ArrowLeft: "left", a: "left", A: "left", ArrowRight: "right", d: "right", D: "right", ArrowUp: "jump", w: "jump", W: "jump", " ": "jump", x: "fire", X: "fire", f: "fire", F: "fire", j: "fire", J: "fire", Shift: "fire", z: "fire", Z: "fire" };
 addEventListener("keydown", (e) => {
+  if (e.target?.tagName === "INPUT") return;
   if (naming) return;
   const k = map_k[e.key]; if (e.repeat) { if (k) e.preventDefault(); return; }
   audioInit();
@@ -1532,6 +1545,35 @@ document.querySelectorAll("#pad button").forEach((b) => {
   b.addEventListener("contextmenu", (e) => e.preventDefault());
 });
 buildEdUI();
+
+// ---------- Menú de ajustes ----------
+function applyPad() { document.documentElement.style.setProperty("--pad", ["60px", "76px", "92px"][CFG.pad]); }
+function exportProgress() {
+  const o = {}; for (const k of ["nivel", "infinito", "estrellas", "heroe", "nombre", "records", "musica", "ajustes"]) { try { const v = localStorage.getItem("zombilandia-" + k); if (v !== null) o[k] = v; } catch {} }
+  return "ZB1." + btoa(unescape(encodeURIComponent(JSON.stringify(o))));
+}
+function importProgress(s) {
+  try { const o = JSON.parse(decodeURIComponent(escape(atob(s.trim().replace(/^ZB1\./, ""))))); for (const k in o) localStorage.setItem("zombilandia-" + k, o[k]); return true; } catch { return false; }
+}
+function setupCfg() {
+  const box = document.getElementById("cfg"); if (!box) return;
+  const sync = () => box.querySelectorAll(".seg").forEach((s) => { const k = s.dataset.k, cur = k === "mus" ? (musicOn ? "1" : "0") : String(CFG[k]); s.querySelectorAll("button").forEach((b) => b.classList.toggle("on", b.dataset.v === cur)); });
+  const open = (on) => { box.hidden = !on; if (on) { sync(); if (!net.role && mode === "play") paused = true; } else paused = false; };
+  document.getElementById("cfgBtn")?.addEventListener("click", () => open(box.hidden));
+  document.getElementById("cfgClose").onclick = () => open(false);
+  document.getElementById("cfgMenu").onclick = () => { open(false); toMenu(); };
+  box.querySelectorAll(".seg button").forEach((b) => b.onclick = () => {
+    const k = b.parentElement.dataset.k, v = b.dataset.v;
+    if (k === "mus") { if ((v === "1") !== musicOn) toggleMusic(); } else { CFG[k] = k === "gfx" ? v : +v; if (k === "gfx" && v === "auto") fxLvl = 2; saveCfg(); if (k === "pad") applyPad(); }
+    sync();
+  });
+  const code = document.getElementById("cfgCode"), msg = document.getElementById("cfgMsg");
+  document.getElementById("cfgExp").onclick = async () => { code.value = exportProgress(); try { await navigator.clipboard.writeText(code.value); msg.textContent = "Código copiado. Pegalo en el otro dispositivo."; } catch { code.select(); msg.textContent = "Copialo a mano."; } };
+  document.getElementById("cfgImp").onclick = () => { if (importProgress(code.value)) { msg.textContent = "¡Progreso cargado!"; setTimeout(() => location.reload(), 600); } else msg.textContent = "Ese código no sirve."; };
+  addEventListener("keydown", (e) => { if (e.target?.tagName === "INPUT") return; if (e.key === "p" || e.key === "P") open(box.hidden); });
+  applyPad();
+}
+setupCfg();
 if (location.hash.startsWith("#nivel=")) unpackLevel(location.hash.slice(7)).then((d) => { shared = d; loadLevel(CUSTOM(d)); mode = "linkintro"; }).catch(() => {});
 window.__game = {
   get state() { const p = players[0]; return { mode, level: levelIdx + 1, lives, score, brains, x: p.x, y: p.y, bossDead, arenaLocked, big: p.tier, power: p.power, w: p.w, h: p.h, n: players.length }; }, keys, keys2, players: () => players, net,
