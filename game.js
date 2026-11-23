@@ -1,7 +1,7 @@
 "use strict";
 // Zombilandia: platformer de zombies en canvas, sin librerías. Personajes y arte propios (rects de píxel).
 // 5 niveles: cementerio, ciudad en ruinas, pantano tóxico, laboratorio y la guarida del Rey Zombi (jefe final).
-const VERSION = "v12"; // subir en cada publicación (también en index.html)
+const VERSION = "v13"; // subir en cada publicación (también en index.html)
 const T = 16, H = 240, ROWS = 15, COLS = 190;
 let W = 480, cache = {};
 const cv = document.getElementById("c"), g = cv.getContext("2d");
@@ -127,6 +127,7 @@ function loadLevel(i) {
   info.spawns.forEach(([col, type], n) => { const r = surface(col), k = ZT[type]; if (r > 0) zombies.push(makeZombie(col * T + (T - k.w) / 2, r * T - k.h, type, n)); });
   items = [];
   for (let y = 0; y < ROWS; y++) for (let x = 0; x < COLS; x++) if (map[y][x] === "c") items.push({ x: x * T + 4, y: y * T + 4, w: 8, h: 8, got: false });
+  totalBrains = items.length + map.reduce((n, row) => n + row.filter((c) => c === "?").length, 0); gotBrains = 0; levelTime = 0; damaged = false;
   deco = [];
   for (let x = 4; x < goalX - 3; x++) {
     const r = surface(x); if (r < 3 || map[r][x] !== "#" || map[r - 1][x] !== " " || map[r - 2][x] === "#") continue;
@@ -163,6 +164,19 @@ function recordScore() {
   inp.onkeydown = (e) => { if (e.key === "Enter") { e.preventDefault(); done(); } e.stopPropagation(); };
 }
 const recLines = (n) => records.slice(0, n).map((r, i) => `${i + 1}. ${r.n.padEnd(3)}  ${String(r.s).padStart(6)}  N${r.lv}`);
+// ---------- Tiempo y estrellas ----------
+// 3 estrellas por nivel: llegar antes del tiempo meta, juntar todos los cerebros y no recibir ningún golpe.
+const PAR = [60, 75, 80, 90, 120]; // segundos
+let levelTime = 0, damaged = false, gotBrains = 0, totalBrains = 0, lastStars = [false, false, false], bests = {}, sel = unlocked - 1;
+try { bests = JSON.parse(localStorage.getItem("zombilandia-estrellas") || "{}"); } catch {}
+const clock = (f) => { const s = Math.floor(f / 60); return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`; };
+function finishLevel() {
+  lastStars = [levelTime / 60 <= PAR[levelIdx], gotBrains >= totalBrains, !damaged];
+  const n = lastStars.filter(Boolean).length, b = bests[levelIdx] || { st: 0, t: Infinity };
+  bests[levelIdx] = { st: Math.max(b.st, n), t: Math.min(b.t, levelTime) };
+  try { localStorage.setItem("zombilandia-estrellas", JSON.stringify(bests)); } catch {}
+}
+function star(x, y, on) { const c = on ? "#f2c94c" : "#3a2f50"; R(x + 3, y, 1, 2, c); R(x, y + 2, 7, 1, c); R(x + 1, y + 3, 5, 1, c); R(x + 2, y + 4, 3, 1, c); R(x + 1, y + 5, 2, 1, c); R(x + 4, y + 5, 2, 1, c); }
 function newGame(i) { runId = Date.now(); player = null; score = 0; lives = 3; brains = 0; loadLevel(i); mode = "play"; }
 loadLevel(0);
 
@@ -315,6 +329,7 @@ function shrink(to = 0) {
 function gameOver() { mode = "over"; player.dead = 1; beep(200, .6, "sawtooth", 40); recordScore(); }
 function hurt(src) {
   const p = player; if (p.inv > 0 || p.dead) return;
+  damaged = true;
   const lvl = Math.max(p.tier, p.want);
   if (lvl > 0) { shrink(lvl - 1); shake = 8; p.inv = 100; p.vy = -4; p.vx = src ? (Math.sign(p.x - src.x) || -p.face) * 3 : -p.face * 2; say(lvl === 2 ? "¡Bajaste a modo bestia!" : "¡Perdiste el poder!"); return; }
   lives--; shake = 8; beep(180, .25, "sawtooth", 60);
@@ -322,7 +337,7 @@ function hurt(src) {
   p.inv = 100; p.vy = -4.5; p.vx = src ? (Math.sign(p.x + p.w / 2 - src.x - src.w / 2) || -p.face) * (src.type === "boss" ? 4 : 2.5) : -p.face * 2;
 }
 function loseLife(col = "#fff") {
-  const p = player; shrink(); lives--; shake = 10; beep(150, .4, "sawtooth", 50); burst(p.x + 5, p.y + 8, col, 14);
+  const p = player; damaged = true; shrink(); lives--; shake = 10; beep(150, .4, "sawtooth", 50); burst(p.x + 5, p.y + 8, col, 14);
   if (lives <= 0) return gameOver();
   Object.assign(p, { x: p.safe.x, y: p.safe.y - 2, vx: 0, vy: 0, inv: 90 });
 }
@@ -364,6 +379,7 @@ function update() {
   time++;
   if (banner) banner--;
   if (mode !== "play") return;
+  levelTime++;
   const p = player, acc = (p.ground ? 0.35 : 0.22) * TIER.acc[p.tier], max = TIER.max[p.tier];
   if (p.growing) tryGrow();
   if (keys.left) { p.vx -= acc; p.face = -1; } else if (keys.right) { p.vx += acc; p.face = 1; } else p.vx *= p.ground ? 0.78 : 0.95;
@@ -412,9 +428,9 @@ function update() {
   for (let i = 0; i < zombies.length; i++) updateZombie(zombies[i], p);
   if (mode !== "play") return;
   for (const it of items) if (!it.got && hit(p, it) && it.kind === "syringe") { it.got = true; powerUp(); }
-  for (const it of items) if (!it.got && hit(p, it)) { it.got = true; brains++; score += 10; beep(880, .08, "triangle", 1320); if (brains % 25 === 0) { lives++; say("¡Vida extra!"); } }
+  for (const it of items) if (!it.got && hit(p, it)) { it.got = true; brains++; gotBrains++; score += 10; beep(880, .08, "triangle", 1320); if (brains % 25 === 0) { lives++; say("¡Vida extra!"); } }
   if (p.x > goalX * T && (!L.boss || bossDead)) {
-    score += lives * 100 + 500; fanfare();
+    score += lives * 100 + 500; fanfare(); finishLevel();
     mode = levelIdx === LEVELS.length - 1 ? "won" : "clear";
     if (mode === "won") recordScore();
   }
@@ -789,6 +805,7 @@ function hud() {
   text(String(score).padStart(5, "0"), W / 2 - 12, 3, "#f2c94c");
   text("N" + (levelIdx + 1), W - 72, 3, "#cfc8e8");
   const pct = Math.min(1, player.x / (goalX * T)); R(W - 52, 6, 40, 4, "#2e2152"); R(W - 52, 6, Math.round(40 * pct), 4, "#7cc456"); R(W - 10, 3, 1, 9, "#cfc8e8"); R(W - 9, 3, 5, 4, "#d6453d");
+  text(clock(levelTime), W - 40, 15, levelTime / 60 > PAR[levelIdx] ? "#ff8a7a" : "#cfc8e8");
   text("RAYO", 8, 15, "#7ff5ff"); R(36, 18, 40, 4, "#1d3a4a"); R(36, 18, Math.round(40 * (1 - player.cd / 40)), 4, player.cd ? "#3fd9ff" : "#bff8ff");
   if (player.power > 0) text(Math.max(player.tier, player.want) === 2 ? "BESTIA x2" : "BESTIA", 84, 15, Math.sin(time * .15) > 0 ? "#ffb03a" : "#ff7a1a");
   const boss = L.boss && arenaLocked && zombies.find((z) => z.type === "boss" && !z.dead);
@@ -808,6 +825,26 @@ function panel(title, sub, c) {
   g.fillStyle = "#f3efe6"; g.font = "11px ui-monospace, monospace";
   sub.forEach((s, i) => g.fillText(s, W / 2, 108 + i * 17)); g.textAlign = "left";
 }
+const titleBoxes = () => LEVELS.map((_, i) => ({ x: Math.round(W / 2 - 116 + i * 48), y: 86, w: 40, h: 40 }));
+function drawTitle() {
+  g.fillStyle = "rgba(7,5,26,.82)"; g.fillRect(0, 0, W, H);
+  g.textAlign = "center"; g.textBaseline = "alphabetic"; g.font = "bold 30px ui-monospace, monospace";
+  g.fillStyle = "#000"; g.fillText("ZOMBILANDIA", W / 2 + 2, 52); g.shadowColor = "#7cc456"; g.shadowBlur = 14; g.fillStyle = "#7cc456"; g.fillText("ZOMBILANDIA", W / 2, 50); g.shadowBlur = 0;
+  g.font = "11px ui-monospace, monospace"; g.fillStyle = "#cfc8e8"; g.fillText("Saltá, disparale y llegá a la bandera.", W / 2, 70);
+  titleBoxes().forEach((b, i) => {
+    const open = i < unlocked, on = i === sel, best = bests[i];
+    R(b.x, b.y, b.w, b.h, on ? "#3b2f60" : "#1d1730"); g.strokeStyle = on ? "#f2c94c" : open ? "#4a3e6b" : "#2a2240"; g.lineWidth = on ? 2 : 1; g.strokeRect(b.x + .5, b.y + .5, b.w - 1, b.h - 1);
+    g.font = "bold 16px ui-monospace, monospace"; g.fillStyle = open ? (i === 4 ? "#ff6a4a" : "#f3efe6") : "#4a3e6b"; g.fillText(open ? String(i + 1) : "×", b.x + b.w / 2, b.y + 22);
+    if (open) for (let k = 0; k < 3; k++) star(b.x + 6 + k * 10, b.y + 29, best && best.st > k);
+  });
+  const L0 = LEVELS[sel], best = bests[sel];
+  g.font = "bold 12px ui-monospace, monospace"; g.fillStyle = sel === 4 ? "#ff6a4a" : "#7cc456"; g.fillText(L0.name, W / 2, 146);
+  g.font = "11px ui-monospace, monospace"; g.fillStyle = "#cfc8e8";
+  g.fillText(best ? `Mejor: ${best.st} de 3 estrellas · ${clock(best.t)} (meta ${clock(PAR[sel] * 60)})` : `Tiempo meta ${clock(PAR[sel] * 60)}`, W / 2, 162);
+  if (records[0]) { g.fillStyle = "#f2c94c"; g.fillText(`Récord: ${records[0].n} ${records[0].s}`, W / 2, 184); }
+  g.fillStyle = "#f3efe6"; g.fillText(unlocked > 1 ? "◀ ▶ elegí nivel · ▲ o tocá para jugar" : "▲ o tocá para jugar", W / 2, 210);
+  g.textAlign = "left";
+}
 function draw() {
   g.save();
   if (shake) g.translate(Math.round((Math.random() - .5) * 4), Math.round((Math.random() - .5) * 4));
@@ -818,8 +855,12 @@ function draw() {
   g.fillStyle = grads().vig; g.fillRect(0, 0, W, H);
   hud(); g.restore();
   g.font = "8px ui-monospace, monospace"; g.textAlign = "right"; g.textBaseline = "bottom"; g.globalAlpha = .6; text(VERSION, W - 3, H - 2, "#cfc8e8"); g.globalAlpha = 1; g.textAlign = "left";
-  if (mode === "title") panel("ZOMBILANDIA", ["Saltá sobre los zombis o usá el rayo.", "Doble salto: saltá otra vez en el aire.", "5 mundos y un jefe final.", records[0] ? `Récord: ${records[0].n} ${records[0].s}` : "", "Tocá o apretá una tecla para empezar", ...(unlocked > 1 ? [`o tocá ⚡ para seguir desde el nivel ${unlocked}`] : [])], "#7cc456");
-  else if (mode === "clear") panel("¡NIVEL SUPERADO!", [L.name, `Puntos: ${score}  ·  Cerebros: ${brains}`, "", `Sigue: ${LEVELS[levelIdx + 1].name}`, "Tocá o apretá una tecla para seguir"], "#f2c94c");
+  if (mode === "title") drawTitle();
+  else if (mode === "__") panel("ZOMBILANDIA", ["Saltá sobre los zombis o usá el rayo.", "Doble salto: saltá otra vez en el aire.", "5 mundos y un jefe final.", records[0] ? `Récord: ${records[0].n} ${records[0].s}` : "", "Tocá o apretá una tecla para empezar", ...(unlocked > 1 ? [`o tocá ⚡ para seguir desde el nivel ${unlocked}`] : [])], "#7cc456");
+  else if (mode === "clear") {
+    panel("¡NIVEL SUPERADO!", [L.name, `${lastStars[0] ? "✓" : "✗"} Tiempo ${clock(levelTime)} (meta ${clock(PAR[levelIdx] * 60)})`, `${lastStars[1] ? "✓" : "✗"} Cerebros ${gotBrains} de ${totalBrains}`, `${lastStars[2] ? "✓" : "✗"} ${damaged ? "Recibiste golpes" : "Sin golpes"}`, `Puntos: ${score}`, "Tocá para seguir"], "#f2c94c");
+    for (let k = 0; k < 3; k++) { g.save(); g.translate(W / 2 - 34 + k * 24, 84); g.scale(2, 2); star(0, 0, lastStars[k]); g.restore(); }
+  }
   else if (mode === "over") panel("TE COMIERON", [`Nivel ${levelIdx + 1}: ${L.name}  ·  ${score} puntos`, ...recLines(3), "", bossCheck && bossCheck.level === levelIdx ? "Tocá para volver a pelear con el jefe" : "Tocá para reintentar el nivel"], "#ff5a5a");
   else if (mode === "won") panel("¡SOBREVIVISTE!", [`Derrotaste al Rey Zombi · ${score} puntos`, "", ...recLines(5), "Tocá para volver"], "#f2c94c");
 }
@@ -836,7 +877,10 @@ requestAnimationFrame(frame);
 // ---------- Entrada ----------
 function press(k) { // empezar, seguir o reintentar
   if (naming) return true;
-  if (mode === "title") { newGame(urlLevel ? urlLevel - 1 : k === "fire" && unlocked > 1 ? unlocked - 1 : 0); return true; }
+  if (mode === "title") {
+    if (k === "left" || k === "right") { sel = Math.max(0, Math.min(unlocked - 1, sel + (k === "left" ? -1 : 1))); beep(660, .05, "square"); return true; }
+    newGame(urlLevel ? urlLevel - 1 : sel); return true;
+  }
   if (mode === "over") {
     lives = 3;
     if (bossCheck && bossCheck.level === levelIdx) { // revancha: arranca en la arena, frente al jefe
@@ -862,7 +906,15 @@ addEventListener("keydown", (e) => {
 });
 addEventListener("keyup", (e) => { const k = map_k[e.key]; if (k) keys[k] = false; });
 addEventListener("blur", () => { keys.left = keys.right = keys.jump = keys.fire = false; });
-cv.addEventListener("pointerdown", () => { audioInit(); press(null); });
+cv.addEventListener("pointerdown", (e) => {
+  audioInit();
+  if (mode === "title" && !naming) { // tocar un nivel lo elige y arranca
+    const r = cv.getBoundingClientRect(), x = (e.clientX - r.left) / r.width * W, y = (e.clientY - r.top) / r.height * H;
+    const i = titleBoxes().findIndex((b) => x >= b.x && x <= b.x + b.w && y >= b.y && y <= b.y + b.h);
+    if (i >= 0 && i < unlocked) sel = i; else if (i >= unlocked) return;
+  }
+  press(null);
+});
 const musBtn = document.getElementById("mus"); if (musBtn) { musBtn.textContent = musicOn ? "♪" : "✕"; musBtn.addEventListener("click", toggleMusic); }
 document.querySelectorAll("#pad button").forEach((b) => {
   const k = b.dataset.k;
