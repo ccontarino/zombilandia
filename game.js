@@ -1,7 +1,7 @@
 "use strict";
 // Zombilandia: platformer de zombies en canvas, sin librerías. Personajes y arte propios (rects de píxel).
 // 5 niveles: cementerio, ciudad en ruinas, pantano tóxico, laboratorio y la guarida del Rey Zombi (jefe final).
-const VERSION = "v45"; // subir en cada publicación (también en index.html)
+const VERSION = "v46"; // subir en cada publicación (también en index.html)
 const T = 16, H = 240, ROWS = 15, COLS = 215;
 let W = 480, cache = {};
 const cv = document.getElementById("c"); let g = cv.getContext("2d"); const MAINCTX = g; let SC = 1;
@@ -107,6 +107,19 @@ let players = [], pi = 0, K = keys, TP = tap, nPlayers = 1;
 const net = { role: null, peer: false, paused: false, rec: null, quiet: false, step() {}, press() { return false; } }; // lo completa net.js
 const me = () => (net.role === "guest" ? 1 : 0);
 const ctx = (i) => { pi = i; player = players[i]; K = inputs[i]; TP = taps[i]; }; // "player" es el jugador que se está procesando
+// Niveles 6-10: los mismos mundos, más difíciles (más zombis, jefe distinto, zombis un poco más veloces)
+(() => {
+  const base = LEVELS.slice(), bosses = ["fireman", "toad", "doctor", "digger", "boss"];
+  const names = ["Cementerio maldito", "Ciudad en llamas", "Pantano nocturno", "Laboratorio secreto", "El regreso del Rey"];
+  const extra = ["24w 50r 82j 120r 143k 168r 31v 95v 150v", "28r 60w 90b 125k 152r 175w 40v 110v", "30j 56r 80j 114k 140r 162w 55s 100s", "36r 54b 84r 120k 156b 177r 62e 130e", "34w 46r 66j 96b 110k 140b 150r 70v 120s"];
+  base.forEach((b, i) => LEVELS.push({ name: names[i], theme: b.theme, boss: b.boss, hard: true, build() {
+    const info = b.build(), bi = info.spawns.findIndex(([, t]) => ZT[t] && ZT[t].boss);
+    if (bi >= 0) info.spawns[bi] = [info.spawns[bi][0], bosses[i]];
+    info.spawns = info.spawns.concat(S(extra[i]));
+    return info;
+  } }));
+})();
+const NL = LEVELS.length; // el modo infinito es el casillero NL; los niveles propios usan NL+1
 const ZT = {
   walker: { w: 12, h: 14, hp: 1, speed: .4, pts: 100 },
   runner: { w: 12, h: 14, hp: 1, speed: 1.0, pts: 150 },
@@ -145,7 +158,7 @@ const DSP = [.8, 1, 1.25], DLIVES = [5, 3, 2];
 let paused = false, fxLvl = 2; // fxLvl: 2 todo, 1 sin bloom, 0 mínimo
 function makeZombie(x, y, type, i) {
   const k = ZT[type];
-  return { x, y, w: k.w, h: k.h, type, hp: k.hp, vx: (i % 2 ? 1 : -1) * k.speed * DSP[CFG.diff] * (.85 + rnd(i) * .3), vy: 0, dead: 0, step: i, t: i * 17, flash: 0, shot: -1, idx: i, uid: ++zuid };
+  return { x, y, w: k.w, h: k.h, type, hp: k.hp, vx: (i % 2 ? 1 : -1) * k.speed * DSP[CFG.diff] * (L && L.hard ? 1.12 : 1) * (.85 + rnd(i) * .3), vy: 0, dead: 0, step: i, t: i * 17, flash: 0, shot: -1, idx: i, uid: ++zuid };
 }
 function addDeco(x0, x1, seed) {
   for (let x = Math.max(1, x0); x < Math.min(x1, COLS - 1); x++) {
@@ -185,7 +198,7 @@ function loadLevel(i) {
   endless = false;
   const keeps = players.map((p) => ({ keep: Math.max(p.tier, p.want), shield: !!p.shield })); // el modo bestia y el escudo pasan al nivel siguiente
   const custom = typeof i === "object"; // un nivel hecho en el editor
-  levelIdx = custom ? 6 : i; L = custom ? i : LEVELS[i]; TH = THEMES[L.theme]; cache = {};
+  levelIdx = custom ? NL + 1 : i; L = custom ? i : LEVELS[i]; TH = THEMES[L.theme]; cache = {};
   for (const row of map) row.fill(" ");
   const info = L.build(); goalX = info.goal; arena = info.arena;
   movers = (info.movers || []).map(([c, r, w, dx, dy, sp], k) => ({ x0: c * T, y0: r * T, x: c * T, y: r * T, w: w * T, h: 8, dx: dx * T, dy: dy * T, sp, t: k * 1.7, vx: 0, vy: 0 }));
@@ -233,7 +246,7 @@ function recordScore() {
 const recLines = (n) => records.slice(0, n).map((r, i) => `${i + 1}. ${r.n.padEnd(3)}  ${String(r.s).padStart(6)}  N${r.lv}`);
 // ---------- Tiempo y estrellas ----------
 // 3 estrellas por nivel: llegar antes del tiempo meta, juntar todos los cerebros y no recibir ningún golpe.
-const PAR = [80, 95, 100, 110, 120]; // segundos
+const PAR = [80, 95, 100, 110, 120, 110, 120, 125, 135, 150]; // segundos
 let levelTime = 0, damaged = false, gotBrains = 0, totalBrains = 0, lastStars = [false, false, false], bests = {}, sel = unlocked - 1;
 try { bests = JSON.parse(localStorage.getItem("zombilandia-estrellas") || "{}"); } catch {}
 const clock = (f) => { const s = Math.floor(f / 60); return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`; };
@@ -315,7 +328,7 @@ function generate() {
 }
 function startEndless() {
   loadLevel(0);
-  endless = true; L = ENDLESS; levelIdx = 5; TH = THEMES.cemetery; cache = {}; distOff = 0; arena = null; goalX = 1e9;
+  endless = true; L = ENDLESS; levelIdx = NL; TH = THEMES.cemetery; cache = {}; distOff = 0; arena = null; goalX = 1e9;
   for (const row of map) row.fill(" ");
   zombies = []; items = []; movers = []; deco = []; fill(0, 19, 13, 14, "#"); genX = 20; generate(); addDeco(4, 19, 0);
   banner = 160; levelStart = 0;
@@ -333,7 +346,7 @@ function shiftWorld() {
   if (th !== TH) { TH = th; cache = {}; say(`${meters()} metros: ¡cambia el mundo!`); }
   generate();
 }
-function newGame(i) { runId = Date.now(); upgrades = {}; players = []; nPlayers = net.peer ? 2 : 1; score = 0; lives = DLIVES[CFG.diff]; brains = 0; if (i === 5) startEndless(); else loadLevel(i); mode = "play"; }
+function newGame(i) { runId = Date.now(); upgrades = {}; players = []; nPlayers = net.peer ? 2 : 1; score = 0; lives = DLIVES[CFG.diff]; brains = 0; if (i === NL) startEndless(); else loadLevel(i); mode = "play"; }
 loadLevel(0);
 
 function collideX(o) {
@@ -1250,7 +1263,7 @@ function hud() {
   if (banner && mode === "play") {
     const a = Math.min(1, banner / 30, (160 - banner) / 20); { const bg = g.createLinearGradient(0, 80, 0, 146); bg.addColorStop(0, "rgba(7,5,26,0)"); bg.addColorStop(.25, "rgba(7,5,26,.8)"); bg.addColorStop(.75, "rgba(7,5,26,.8)"); bg.addColorStop(1, "rgba(7,5,26,0)"); g.globalAlpha = a; g.fillStyle = bg; g.fillRect(0, 80, W, 66); } g.globalAlpha = a * .0; g.globalAlpha = a;
     g.textAlign = "center"; g.font = "10px ui-monospace, monospace"; text(endless ? `RÉCORD: ${endBest} METROS` : `NIVEL ${levelIdx + 1} DE ${LEVELS.length}`, W / 2, 95, "#cfc8e8");
-    g.font = "bold 16px ui-monospace, monospace"; text(L.name.toUpperCase(), W / 2, 111, levelIdx === 4 ? "#ff6a4a" : "#7cc456");
+    g.font = "bold 16px ui-monospace, monospace"; text(L.name.toUpperCase(), W / 2, 111, L.boss ? "#ff6a4a" : "#7cc456");
     g.globalAlpha = 1; g.textAlign = "left";
   }
 }
@@ -1262,8 +1275,8 @@ function panel(title, sub, c) {
   g.fillStyle = "#f3efe6"; g.font = "11px ui-monospace, monospace";
   sub.forEach((s, i) => g.fillText(s, W / 2, 108 + i * 17)); g.textAlign = "left";
 }
-const titleBoxes = () => [...LEVELS, ENDLESS].map((_, i) => ({ x: Math.round(W / 2 - 140 + i * 48), y: 86, w: 40, h: 40 }));
-const titleOpen = (i) => i === 5 || i < unlocked;
+const titleBoxes = () => [...LEVELS, ENDLESS].map((_, i) => { const row = i < 5 ? 0 : 1, n = row ? NL - 4 : 5, c = row ? i - 5 : i; return { x: Math.round(W / 2 - (n * 48 - 8) / 2 + c * 48), y: 76 + row * 32, w: 40, h: 28 }; });
+const titleOpen = (i) => i === NL || i < unlocked;
 function drawTitle() {
   g.fillStyle = "rgba(7,5,26,.82)"; g.fillRect(0, 0, W, H);
   g.textAlign = "center"; g.textBaseline = "alphabetic"; g.font = "bold 30px ui-monospace, monospace";
@@ -1272,14 +1285,14 @@ function drawTitle() {
   titleBoxes().forEach((b, i) => {
     const open = titleOpen(i), on = i === sel, best = bests[i];
     rr(b.x, b.y, b.w, b.h, 5, on ? "#3b2f60" : "#1d1730"); g.strokeStyle = on ? "#f2c94c" : open ? "#4a3e6b" : "#2a2240"; g.lineWidth = on ? 2 : 1; g.beginPath(); g.roundRect ? g.roundRect(b.x + .5, b.y + .5, b.w - 1, b.h - 1, 5) : g.rect(b.x + .5, b.y + .5, b.w - 1, b.h - 1); g.stroke(); if (on) glow(b.x + b.w / 2, b.y + b.h / 2, 34, "#f2c94c", .35);
-    g.font = "bold 16px ui-monospace, monospace"; g.fillStyle = open ? (i === 4 ? "#ff6a4a" : "#f3efe6") : "#4a3e6b"; g.fillText(i === 5 ? "∞" : open ? String(i + 1) : "×", b.x + b.w / 2, b.y + 22);
-    if (open && i < 5) for (let k = 0; k < 3; k++) star(b.x + 6 + k * 10, b.y + 29, best && best.st > k);
-    if (i === 5) { g.font = "9px ui-monospace, monospace"; g.fillStyle = "#7cc456"; g.fillText(endBest ? `${endBest}m` : "nuevo", b.x + b.w / 2, b.y + 35); }
+    g.font = "bold 16px ui-monospace, monospace"; g.fillStyle = open ? (LEVELS[i] && LEVELS[i].boss ? "#ff6a4a" : i > 4 && i < NL ? "#ffb03a" : "#f3efe6") : "#4a3e6b"; g.fillText(i === NL ? "∞" : open ? String(i + 1) : "×", b.x + b.w / 2, b.y + 14);
+    if (open && i < NL) for (let k = 0; k < 3; k++) star(b.x + 6 + k * 10, b.y + 19, best && best.st > k);
+    if (i === NL) { g.font = "9px ui-monospace, monospace"; g.fillStyle = "#7cc456"; g.fillText(endBest ? `${endBest}m` : "nuevo", b.x + b.w / 2, b.y + 25); }
   });
-  const L0 = sel === 5 ? ENDLESS : LEVELS[sel], best = bests[sel];
-  g.font = "bold 12px ui-monospace, monospace"; g.fillStyle = sel === 4 ? "#ff6a4a" : "#7cc456"; g.fillText(L0.name, W / 2, 146);
+  const L0 = sel === NL ? ENDLESS : LEVELS[sel], best = bests[sel];
+  g.font = "bold 12px ui-monospace, monospace"; g.fillStyle = L0.boss ? "#ff6a4a" : "#7cc456"; g.fillText(L0.name, W / 2, 152);
   g.font = "11px ui-monospace, monospace"; g.fillStyle = "#cfc8e8";
-  if (sel === 5) g.fillText(`Corré todo lo que puedas · récord ${endBest} m`, W / 2, 162);
+  if (sel === NL) g.fillText(`Corré todo lo que puedas · récord ${endBest} m`, W / 2, 162);
   else g.fillText(best ? `Mejor: ${best.st} de 3 estrellas · ${clock(best.t)} (meta ${clock(PAR[sel] * 60)})` : `Tiempo meta ${clock(PAR[sel] * 60)}`, W / 2, 162);
   if (records[0]) { g.fillStyle = "#f2c94c"; g.fillText(`Récord: ${records[0].n} ${records[0].s}`, W / 2, 180); }
   g.fillStyle = hero === 1 ? "#9ad0ff" : "#7ff5ff"; g.font = "bold 11px ui-monospace, monospace"; g.fillText(`${HEROES[hero].name} · ${HEROES[hero].power}`, W / 2, 196); g.font = "11px ui-monospace, monospace";
@@ -1476,7 +1489,7 @@ function draw() {
   hud(); g.restore();
   g.font = "8px ui-monospace, monospace"; g.textAlign = "right"; g.textBaseline = "bottom"; g.globalAlpha = .6; text(VERSION, W - 3, H - 2, "#cfc8e8"); g.globalAlpha = 1; g.textAlign = "left";
   if (mode === "title") { if (net.role === "guest" || net.joining) net.lobby(); else drawTitle(); }
-  else if (mode === "__") panel("ZOMBILANDIA", ["Saltá sobre los zombis o usá el rayo.", "Doble salto: saltá otra vez en el aire.", "5 mundos y un jefe final.", records[0] ? `Récord: ${records[0].n} ${records[0].s}` : "", "Tocá o apretá una tecla para empezar", ...(unlocked > 1 ? [`o tocá ⚡ para seguir desde el nivel ${unlocked}`] : [])], "#7cc456");
+  else if (mode === "__") panel("ZOMBILANDIA", ["Saltá sobre los zombis o usá el rayo.", "Doble salto: saltá otra vez en el aire.", "10 niveles, jefes y modo infinito.", records[0] ? `Récord: ${records[0].n} ${records[0].s}` : "", "Tocá o apretá una tecla para empezar", ...(unlocked > 1 ? [`o tocá ⚡ para seguir desde el nivel ${unlocked}`] : [])], "#7cc456");
   else if (mode === "shop") drawShop();
   else if (mode === "clear") {
     panel("¡NIVEL SUPERADO!", [L.name, `${lastStars[0] ? "✓" : "✗"} Tiempo ${clock(levelTime)} (meta ${clock(PAR[levelIdx] * 60)})`, `${lastStars[1] ? "✓" : "✗"} Cerebros ${gotBrains} de ${totalBrains}`, `${lastStars[2] ? "✓" : "✗"} ${damaged ? "Recibiste golpes" : "Sin golpes"}`, `Puntos: ${score}`, "Tocá para seguir"], "#f2c94c");
@@ -1509,14 +1522,14 @@ requestAnimationFrame(frame);
 function toMenu() { // volver a la pantalla de niveles desde una partida
   if (mode === "title" || mode === "linkintro" || naming || document.body.classList.contains("editing")) return;
   if (net.role === "guest") { document.getElementById("online")?.click(); return; } // el invitado no maneja el menú: abre el panel online (con "Salir")
-  sel = Math.min(Math.max(levelIdx, 0), unlocked - 1); if (endless) sel = 5;
+  sel = Math.min(Math.max(levelIdx, 0), unlocked - 1); if (endless) sel = NL;
   mode = "title"; loadLevel(0); beep(300, .1, "triangle", 200);
 }
 function press(k) { // empezar, seguir o reintentar
   if (naming) return true;
   if (net.role && net.press(k)) return true;
   if (mode === "title") {
-    if (k === "left" || k === "right") { const av = [...Array(unlocked).keys(), 5], j = av.indexOf(sel); sel = av[Math.max(0, Math.min(av.length - 1, (j < 0 ? 0 : j) + (k === "left" ? -1 : 1)))]; beep(660, .05, "square"); return true; }
+    if (k === "left" || k === "right") { const av = [...Array(unlocked).keys(), NL], j = av.indexOf(sel); sel = av[Math.max(0, Math.min(av.length - 1, (j < 0 ? 0 : j) + (k === "left" ? -1 : 1)))]; beep(660, .05, "square"); return true; }
     if (k === "fire") { setHero(1 - hero); beep(hero ? 1500 : 900, .12, "triangle", hero ? 2400 : 1400); return true; }
     newGame(urlLevel ? urlLevel - 1 : sel); return true;
   }
@@ -1527,7 +1540,7 @@ function press(k) { // empezar, seguir o reintentar
       zombies = zombies.filter(isBoss); banner = 0;
       const rx = (arena.wall + 4) * T, ry = surface(arena.wall + 4) * T - 16;
       players.forEach((q, i) => Object.assign(q, { x: rx + i * 14, y: ry, safe: { x: rx + i * 14, y: ry } })); lockArena(); say(`¡Revancha con ${BOSS_NAME[zombies[0].type]}!`);
-    } else if (endless) { newGame(5); return true; } else if (L.custom) { runCustom(L.data, customFrom); return true; } else { score = levelStart; loadLevel(levelIdx); }
+    } else if (endless) { newGame(NL); return true; } else if (L.custom) { runCustom(L.data, customFrom); return true; } else { score = levelStart; loadLevel(levelIdx); }
     mode = "play"; return true;
   }
   if (mode === "clear") { bossCheck = null; mode = "shop"; shopSel = 0; shopMsgT = 0; return true; }
@@ -1553,7 +1566,7 @@ addEventListener("keydown", (e) => {
   if (mode === "title" && !net.role && (e.key === "e" || e.key === "E")) { enterEditor(edData); return; }
   if (mode === "shop" && net.role !== "guest" && (e.key === "ArrowDown" || e.key === "s" || e.key === "S")) { shopSel = (shopSel + 1) % SHOP.length; return; }
   if (mode === "shop" && net.role !== "guest" && e.key === "ArrowUp") { shopSel = (shopSel - 1 + SHOP.length) % SHOP.length; return; }
-  if (mode === "title" && net.role !== "guest" && /^[1-6]$/.test(e.key) && (+e.key <= unlocked || e.key === "6")) { newGame(+e.key - 1); return; } // elegir nivel ya desbloqueado
+  if (mode === "title" && net.role !== "guest" && /^[0-9i]$/.test(e.key) && (e.key === "i" || (+e.key || 10) <= unlocked)) { newGame(e.key === "i" ? NL : (+e.key || 10) - 1); return; } // elegir nivel ya desbloqueado
   if (press(k)) { e.preventDefault(); return; }
   if (k) { keys[k] = true; if (k in tap) tap[k] = true; e.preventDefault(); }
 });
