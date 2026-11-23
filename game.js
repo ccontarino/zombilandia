@@ -1,7 +1,7 @@
 "use strict";
 // Zombilandia: platformer de zombies en canvas, sin librerías. Personajes y arte propios (rects de píxel).
 // 5 niveles: cementerio, ciudad en ruinas, pantano tóxico, laboratorio y la guarida del Rey Zombi (jefe final).
-const VERSION = "v28"; // subir en cada publicación (también en index.html)
+const VERSION = "v29"; // subir en cada publicación (también en index.html)
 const T = 16, H = 240, ROWS = 15, COLS = 215;
 let W = 480, cache = {};
 const cv = document.getElementById("c"), g = cv.getContext("2d");
@@ -1350,6 +1350,12 @@ function frame(now) {
 requestAnimationFrame(frame);
 
 // ---------- Entrada ----------
+function toMenu() { // volver a la pantalla de niveles desde una partida
+  if (mode === "title" || mode === "linkintro" || naming || document.body.classList.contains("editing")) return;
+  if (net.role === "guest") { document.getElementById("online")?.click(); return; } // el invitado no maneja el menú: abre el panel online (con "Salir")
+  sel = Math.min(Math.max(levelIdx, 0), unlocked - 1); if (endless) sel = 5;
+  mode = "title"; loadLevel(0); beep(300, .1, "triangle", 200);
+}
 function press(k) { // empezar, seguir o reintentar
   if (naming) return true;
   if (net.role && net.press(k)) return true;
@@ -1384,6 +1390,7 @@ addEventListener("keydown", (e) => {
   if (naming) return;
   const k = map_k[e.key]; if (e.repeat) { if (k) e.preventDefault(); return; }
   audioInit();
+  if (e.key === "Escape") { toMenu(); return; }
   if (e.key === "m" || e.key === "M") { toggleMusic(); return; }
   if (mode === "title" && net.role !== "guest" && (e.key === "c" || e.key === "C")) { setHero(1 - hero); return; }
   if (mode === "title" && !net.role && (e.key === "e" || e.key === "E")) { enterEditor(edData); return; }
@@ -1413,6 +1420,7 @@ cv.addEventListener("pointerdown", (e) => {
   }
   press(null);
 });
+const menuBtn = document.getElementById("menu"); if (menuBtn) menuBtn.addEventListener("click", toMenu);
 const vibBtn = document.getElementById("vib"); if (vibBtn) { if (!canVibe) vibBtn.remove(); else { vibBtn.style.opacity = vibeOn ? 1 : .4; vibBtn.addEventListener("click", toggleVibe); } }
 const musBtn = document.getElementById("mus"); if (musBtn) { musBtn.textContent = musicOn ? "♪" : "✕"; musBtn.addEventListener("click", toggleMusic); }
 document.querySelectorAll("#pad button").forEach((b) => {
