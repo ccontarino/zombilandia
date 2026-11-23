@@ -1,7 +1,7 @@
 "use strict";
 // Zombilandia: platformer de zombies en canvas, sin librerías. Personajes y arte propios (rects de píxel).
 // 5 niveles: cementerio, ciudad en ruinas, pantano tóxico, laboratorio y la guarida del Rey Zombi (jefe final).
-const VERSION = "v8"; // subir en cada publicación (también en index.html)
+const VERSION = "v9"; // subir en cada publicación (también en index.html)
 const T = 16, H = 240, ROWS = 15, COLS = 190;
 let W = 480, cache = {};
 const cv = document.getElementById("c"), g = cv.getContext("2d");
@@ -106,6 +106,7 @@ const ZT = {
   brute: { w: 16, h: 20, hp: 3, speed: .28, pts: 300 },
   boss: { w: 28, h: 36, hp: 12, speed: .55, pts: 2000 },
 };
+let bossCheck = null; // punto de control en la arena del jefe: si perdés ahí, volvés directo al jefe
 let mode = "title", levelIdx = 0, L, TH, goalX = 184, levelStart = 0, banner = 0, bossDead = false, arenaLocked = false, deco = [];
 let player, zombies, items, parts, cam = 0, score = 0, lives = 3, brains = 0, time = 0, msg = "", msgT = 0, shake = 0, unlocked = 1;
 try { unlocked = Math.max(1, Math.min(LEVELS.length, +localStorage.getItem("zombilandia-nivel") || 1)); } catch {}
@@ -135,7 +136,8 @@ function loadLevel(i) {
   parts = []; cam = 0; shake = 0; msg = ""; msgT = 0; banner = 160; bossDead = false; arenaLocked = false; levelStart = score;
   if (i + 1 > unlocked) { unlocked = i + 1; try { localStorage.setItem("zombilandia-nivel", unlocked); } catch {} }
 }
-function newGame(i) { player = null; score = 0; lives = 3; brains = 0; loadLevel(i); mode = "play"; }
+function lockArena() { arenaLocked = true; fill(155, 156, 2, 12, "#"); shake = 20; beep(90, .8, "sawtooth", 40); }
+function newGame(i) { bossCheck = null; player = null; score = 0; lives = 3; brains = 0; loadLevel(i); mode = "play"; }
 loadLevel(0);
 
 function collideX(o) {
@@ -301,7 +303,7 @@ function update() {
   else if (touching(p, "~", 4)) loseLife(TH.liquid[0]);
   if (mode !== "play") return;
   if (L.boss && !arenaLocked && p.x > 161 * T) { // se cierra la arena del jefe
-    arenaLocked = true; fill(155, 156, 2, 12, "#"); shake = 20; say("¡Apareció el Rey Zombi!"); beep(90, .8, "sawtooth", 40);
+    lockArena(); say("¡Apareció el Rey Zombi!"); bossCheck = { score, brains, level: levelIdx };
   }
   for (let i = 0; i < zombies.length; i++) updateZombie(zombies[i], p);
   if (mode !== "play") return;
@@ -711,7 +713,7 @@ function draw() {
   g.font = "8px ui-monospace, monospace"; g.textAlign = "right"; g.textBaseline = "bottom"; g.globalAlpha = .6; text(VERSION, W - 3, H - 2, "#cfc8e8"); g.globalAlpha = 1; g.textAlign = "left";
   if (mode === "title") panel("ZOMBILANDIA", ["Saltá sobre los zombis o usá el rayo.", "Doble salto: saltá otra vez en el aire.", "5 mundos y un jefe final.", "", "Tocá o apretá una tecla para empezar", ...(unlocked > 1 ? [`o tocá ⚡ para seguir desde el nivel ${unlocked}`] : [])], "#7cc456");
   else if (mode === "clear") panel("¡NIVEL SUPERADO!", [L.name, `Puntos: ${score}  ·  Cerebros: ${brains}`, "", `Sigue: ${LEVELS[levelIdx + 1].name}`, "Tocá o apretá una tecla para seguir"], "#f2c94c");
-  else if (mode === "over") panel("TE COMIERON", [`Nivel ${levelIdx + 1}: ${L.name}`, "", "Tocá o apretá una tecla", "para reintentar el nivel"], "#ff5a5a");
+  else if (mode === "over") panel("TE COMIERON", [`Nivel ${levelIdx + 1}: ${L.name}`, "", "Tocá o apretá una tecla", bossCheck && bossCheck.level === levelIdx ? "para volver a pelear con el jefe" : "para reintentar el nivel"], "#ff5a5a");
   else if (mode === "won") panel("¡SOBREVIVISTE!", ["Derrotaste al Rey Zombi.", `Puntos: ${score}  ·  Cerebros: ${brains}`, "", "Tocá o apretá una tecla para volver"], "#f2c94c");
 }
 
@@ -727,8 +729,16 @@ requestAnimationFrame(frame);
 // ---------- Entrada ----------
 function press(k) { // empezar, seguir o reintentar
   if (mode === "title") { newGame(urlLevel ? urlLevel - 1 : k === "fire" && unlocked > 1 ? unlocked - 1 : 0); return true; }
-  if (mode === "over") { lives = 3; score = levelStart; loadLevel(levelIdx); mode = "play"; return true; }
-  if (mode === "clear") { loadLevel(levelIdx + 1); mode = "play"; return true; }
+  if (mode === "over") {
+    lives = 3;
+    if (bossCheck && bossCheck.level === levelIdx) { // revancha: arranca en la arena, frente al jefe
+      score = bossCheck.score; brains = bossCheck.brains; loadLevel(levelIdx);
+      zombies = zombies.filter((z) => z.type === "boss"); banner = 0;
+      Object.assign(player, { x: 159 * T, y: 12 * T, safe: { x: 159 * T, y: 12 * T } }); lockArena(); say("¡Revancha con el Rey Zombi!");
+    } else { score = levelStart; loadLevel(levelIdx); }
+    mode = "play"; return true;
+  }
+  if (mode === "clear") { bossCheck = null; loadLevel(levelIdx + 1); mode = "play"; return true; }
   if (mode === "won") { mode = "title"; loadLevel(0); return true; }
   return false;
 }
@@ -751,5 +761,5 @@ document.querySelectorAll("#pad button").forEach((b) => {
 });
 window.__game = {
   get state() { return { mode, level: levelIdx + 1, lives, score, brains, x: player.x, y: player.y, bossDead, arenaLocked, big: player.big, power: player.power }; }, keys,
-  debug: { load(i) { newGame(i); }, tp(col) { const r = surface(col); Object.assign(player, { x: col * T, y: (r > 0 ? r : 10) * T - 16, vx: 0, vy: 0 }); }, god() { lives = 99; }, power() { powerUp(); }, peace() { zombies.length = 0; }, get boss() { const z = zombies.find((z) => z.type === "boss"); return z && { x: z.x, hp: z.hp, dead: z.dead }; } },
+  debug: { load(i) { newGame(i); }, tp(col) { const r = surface(col); Object.assign(player, { x: col * T, y: (r > 0 ? r : 10) * T - 16, vx: 0, vy: 0 }); }, god() { lives = 99; }, die() { lives = 1; loseLife(); }, power() { powerUp(); }, peace() { zombies.length = 0; }, get boss() { const z = zombies.find((z) => z.type === "boss"); return z && { x: z.x, hp: z.hp, dead: z.dead }; } },
 };
