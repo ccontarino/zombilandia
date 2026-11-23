@@ -1,7 +1,12 @@
 "use strict";
 // Zombilandia: platformer de zombies en canvas, sin librerías. Personajes y arte propios (rects de píxel).
 // 5 niveles: cementerio, ciudad en ruinas, pantano tóxico, laboratorio y la guarida del Rey Zombi (jefe final).
-const VERSION = "v49"; // subir en cada publicación (también en index.html)
+const VERSION = "v50"; // subir en cada publicación (también en index.html)
+// ---------- Métricas de uso (Umami, anónimas, sin cookies) ----------
+// Pegá acá el "Website ID" de tu sitio en Umami; vacío = no se manda nada. Respeta "No rastrear" del navegador y solo cuenta en el sitio publicado.
+const UMAMI = { id: "", src: "https://cloud.umami.is/script.js", domains: "ccontarino.github.io" };
+if (UMAMI.id) { const s = document.createElement("script"); s.defer = true; s.src = UMAMI.src; s.dataset.websiteId = UMAMI.id; s.dataset.domains = UMAMI.domains; s.dataset.doNotTrack = "true"; document.head.appendChild(s); }
+const track = (name, data) => { try { if (window.umami && net.role !== "guest") window.umami.track(name, data); } catch {} };
 const T = 16, H = 240, ROWS = 15, COLS = 215;
 let W = 480, cache = {};
 const cv = document.getElementById("c"); let g = cv.getContext("2d"); const MAINCTX = g; let SC = 1;
@@ -232,7 +237,7 @@ try { ach = JSON.parse(localStorage.getItem("zombilandia-logros") || "{}"); stat
 const skinOpen = (s) => s === 0 || !!ach[ACH.find((a) => a.skin === s)?.id];
 if (!skinOpen(CFG.skin || 0)) CFG.skin = 0;
 function unlock(id) {
-  if (ach[id] || net.role === "guest") return; ach[id] = 1; try { localStorage.setItem("zombilandia-logros", JSON.stringify(ach)); } catch {}
+  if (ach[id] || net.role === "guest") return; ach[id] = 1; track("logro", { id }); try { localStorage.setItem("zombilandia-logros", JSON.stringify(ach)); } catch {}
   const a = ACH.find((x) => x.id === id); toasts.push({ t: 240, txt: a.name, sub: a.skin ? "¡Traje " + SKINS[a.skin] + " desbloqueado!" : a.desc }); beep(880, .1, "triangle", 1320); beep(1320, .15, "triangle", 1760, .1);
 }
 const addKill = () => { stats.kills++; unlock("primera"); if (stats.kills >= 50) unlock("cazador"); if (stats.kills % 5 === 0) try { localStorage.setItem("zombilandia-stats", JSON.stringify(stats)); } catch {} };
@@ -299,6 +304,7 @@ const clock = (f) => { const s = Math.floor(f / 60); return `${Math.floor(s / 60
 function finishLevel() {
   lastStars = [levelTime / 60 <= PAR[levelIdx], gotBrains >= totalBrains, !damaged];
   if (lastStars.every(Boolean)) unlock("perfecto"); if (lastStars[2]) unlock("sin_golpes"); if (lastStars[1]) unlock("cerebros"); if (net.peer) unlock("amigos");
+  track("nivel_superado", { nivel: levelIdx + 1, estrellas: lastStars.filter(Boolean).length, segundos: Math.round(levelTime / 60), vidas: lives, online: net.peer ? 1 : 0 });
   const n = lastStars.filter(Boolean).length, b = bests[levelIdx] || { st: 0, t: Infinity };
   bests[levelIdx] = { st: Math.max(b.st, n), t: Math.min(b.t, levelTime) };
   try { localStorage.setItem("zombilandia-estrellas", JSON.stringify(bests)); } catch {}
@@ -392,7 +398,7 @@ function shiftWorld() {
   if (th !== TH) { TH = th; cache = {}; say(`${meters()} metros: ¡cambia el mundo!`); }
   generate();
 }
-function newGame(i) { runId = Date.now(); upgrades = {}; players = []; nPlayers = net.peer ? 2 : 1; score = 0; lives = DLIVES[CFG.diff]; brains = 0; if (i === NL) startEndless(); else loadLevel(i); mode = "play"; }
+function newGame(i) { track("nivel_inicio", { nivel: i === NL ? "infinito" : i + 1, dificultad: ["facil", "normal", "dificil"][CFG.diff], online: net.peer ? 1 : 0, heroe: hero }); runId = Date.now(); upgrades = {}; players = []; nPlayers = net.peer ? 2 : 1; score = 0; lives = DLIVES[CFG.diff]; brains = 0; if (i === NL) startEndless(); else loadLevel(i); mode = "play"; }
 loadLevel(0);
 
 function collideX(o) {
@@ -553,7 +559,7 @@ function shrink(to = 0) {
   const p = player; if (p.tier > to) setTier(to);
   Object.assign(p, { want: to, growing: false, power: to > 0 ? 1 : 0 }); beep(500, .3, "triangle", 150);
 }
-function gameOver() { if (endless && meters() >= 500) unlock("maraton"); if (endless && meters() > endBest) { endBest = meters(); try { localStorage.setItem("zombilandia-infinito", endBest); } catch {} } mode = "over"; for (const q of players) q.dead = 1; beep(200, .6, "sawtooth", 40); recordScore(); }
+function gameOver() { track("game_over", { nivel: endless ? "infinito" : levelIdx + 1, puntos: score, jefe: bossCheck && bossCheck.level === levelIdx ? 1 : 0 });  if (endless && meters() >= 500) unlock("maraton"); if (endless && meters() > endBest) { endBest = meters(); try { localStorage.setItem("zombilandia-infinito", endBest); } catch {} } mode = "over"; for (const q of players) q.dead = 1; beep(200, .6, "sawtooth", 40); recordScore(); }
 function hurt(src) {
   if (player.inv <= 0 && !player.dead) vibe(70);
   const p = player; if (p.inv > 0 || p.dead) return;
@@ -582,7 +588,7 @@ function damage(z, n) {
   z.hp -= n; z.flash = 12; burst(z.x + z.w / 2, z.y + z.h / 2, "#bff8ff", 5);
   if (z.hp > 0) { beep(320, .08, "square", 160); if (isBoss(z)) shake = 4; return; }
   z.dead = 1; addKill(); if (isBoss(z)) unlock("rey"); score += ZT[z.type].pts; burst(z.x + z.w / 2, z.y + z.h / 2, "#7fbf5a", isBoss(z) ? 50 : 10, isBoss(z) ? 6 : 3); beep(220, .15, "square", 90);
-  if (isBoss(z)) { bossDead = true; shake = 40; say(`¡Derrotaste ${deA(BOSS_NAME[z.type])}!`); vibe([80, 60, 160]); fanfare(); for (const m of zombies) if (!m.dead) { m.dead = 1; burst(m.x + 6, m.y + 6, "#7fbf5a", 8); } }
+  if (isBoss(z)) { track("jefe_derrotado", { jefe: z.type, nivel: levelIdx + 1 }); bossDead = true; shake = 40; say(`¡Derrotaste ${deA(BOSS_NAME[z.type])}!`); vibe([80, 60, 160]); fanfare(); for (const m of zombies) if (!m.dead) { m.dead = 1; burst(m.x + 6, m.y + 6, "#7fbf5a", 8); } }
 }
 // Jefes intermedios: cada uno con su forma de atacar
 function bossAI(z, p, dx) {
@@ -799,7 +805,7 @@ function update() {
   if (players.some((q) => q.x > goalX * T) && (!arena || bossDead)) {
     score += lives * 100 + 500; fanfare();
     if (L.custom) { mode = "cwin"; recordScore(); } else { finishLevel(); mode = levelIdx === LEVELS.length - 1 ? "won" : "clear"; }
-    if (mode === "won") recordScore();
+    if (mode === "won") { recordScore(); track("juego_terminado", { puntos: score }); }
   }
   for (const q of parts) { q.x += q.vx; q.y += q.vy; q.vy += .15; q.life--; }
   parts = parts.filter((q) => q.life > 0);

@@ -86,6 +86,7 @@ const DEFAULT_RELAY = "wss://zombilandia.ccontarino.workers.dev"; // dirección 
     net.peer = false; net.rec = null; keys2.left = keys2.right = keys2.jump = keys2.fire = false; note = why || "";
   }
   function peerJoin() {
+    if (!net.peer) track("online_conectado", { rol: "anfitrion" });
     net.peer = true; net.rec = []; lvlDirty = true; lastRx = performance.now(); note = "";
     nPlayers = 2;
     if (players.length === 1) { // se sumó con la partida empezada
