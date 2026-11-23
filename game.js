@@ -1,7 +1,7 @@
 "use strict";
 // Zombilandia: platformer de zombies en canvas, sin librerías. Personajes y arte propios (rects de píxel).
 // 5 niveles: cementerio, ciudad en ruinas, pantano tóxico, laboratorio y la guarida del Rey Zombi (jefe final).
-const VERSION = "v16"; // subir en cada publicación (también en index.html)
+const VERSION = "v17"; // subir en cada publicación (también en index.html)
 const T = 16, H = 240, ROWS = 15, COLS = 190;
 let W = 480, cache = {};
 const cv = document.getElementById("c"), g = cv.getContext("2d");
@@ -21,7 +21,7 @@ const fill = (x0, x1, y0, y1, ch) => { for (let x = x0; x <= x1; x++) for (let y
 const plat = (x, y, n, ch = "=") => fill(x, x + n - 1, y, y, ch);
 const coins = (x, y, n) => { for (let i = 0; i < n; i++) if (map[y]?.[x + i] === " ") set(x + i, y, "c"); };
 const arc = (x, y, n) => { for (let i = 0; i < n; i++) if (map[y - Math.round(Math.sin(i / (n - 1) * Math.PI) * 2)]?.[x + i] === " ") set(x + i, y - Math.round(Math.sin(i / (n - 1) * Math.PI) * 2), "c"); };
-const S = (s) => s.split(" ").map((t) => [parseInt(t), { w: "walker", r: "runner", j: "jumper", b: "brute", B: "boss" }[t.slice(-1)]]);
+const S = (s) => s.split(" ").map((t) => [parseInt(t), { w: "walker", r: "runner", j: "jumper", b: "brute", B: "boss", v: "bat", s: "spitter", e: "shielder" }[t.slice(-1)]]);
 const solid = (tx, ty) => { if (tx < 0 || tx >= COLS) return true; if (ty < 0 || ty >= ROWS) return false; const c = map[ty][tx]; return c === "#" || c === "=" || c === "?" || c === "S" || c === "O" || c === "u" || c === "^"; };
 function surface(col) { let r = ROWS - 1; if (!solid(col, r)) return -1; while (r > 0 && solid(col, r - 1)) r--; return r; }
 
@@ -48,7 +48,7 @@ const LEVELS = [
     plat(156, 9, 3); plat(160, 7, 3); plat(164, 5, 3); coins(164, 4, 3);
     for (let i = 0; i < 6; i++) fill(172 + i, 172 + i, 12 - i, 12, "#");
     set(23, 10, "S"); set(101, 9, "O");
-    return { goal: 184, spawns: S("18w 27w 40w 47w 60w 66w 85w 90w 104w 110r 115w 128w 134w 148r 152w 158w 166r 170w") };
+    return { goal: 184, spawns: S("18w 27w 40w 47w 60w 66w 85w 90w 104w 110r 115w 128w 134w 148r 152w 158w 166r 170w 35v 78v 124v 160v") };
   } },
   { name: "Ciudad en ruinas", theme: "city", build() {
     const B = [[0, 15, 13], [18, 27, 11], [30, 37, 9], [40, 47, 10], [51, 58, 12], [61, 66, 8], [69, 78, 11], [82, 88, 10], [92, 100, 12], [104, 110, 9], [113, 120, 7], [123, 132, 10], [136, 141, 12], [145, 152, 9], [155, 160, 11], [163, 170, 8], [173, 189, 12]];
@@ -57,7 +57,7 @@ const LEVELS = [
     set(57, 11, "^"); set(159, 10, "^"); set(26, 10, "^");
     plat(21, 6, 3, "?"); plat(72, 7, 3, "?"); plat(126, 6, 2, "?"); plat(43, 6, 3); coins(43, 5, 3); plat(85, 6, 3); coins(85, 5, 3); plat(147, 5, 4); coins(147, 4, 4);
     set(73, 7, "S"); set(127, 6, "O");
-    return { goal: 185, spawns: S("22w 34w 44r 54w 63j 73r 76w 85w 96r 107w 116j 127r 130w 148b 158r 166w 178r 181w") };
+    return { goal: 185, spawns: S("22w 34w 44r 54w 63j 73r 76w 85w 96r 107w 116j 127r 130w 148b 158r 166w 178r 181w 47e 100s 140v 168e") };
   } },
   { name: "Pantano tóxico", theme: "swamp", build() {
     fill(0, COLS - 1, 13, 14, "#");
@@ -69,7 +69,7 @@ const LEVELS = [
     plat(34, 9, 4); coins(34, 8, 4); plat(102, 8, 3, "?"); plat(118, 9, 4); coins(118, 8, 4); plat(146, 8, 3); coins(146, 7, 3); plat(172, 9, 3, "?"); plat(46, 9, 2, "?");
     for (let i = 0; i < 4; i++) fill(176 + i, 176 + i, 12 - i, 12, "#");
     set(103, 8, "S"); set(173, 9, "O");
-    return { goal: 185, spawns: S("10w 22j 35w 46j 60w 62j 74r 89j 92w 104j 119w 121j 131b 148j 160r 163j 172w") };
+    return { goal: 185, spawns: S("10w 22j 35w 46j 60w 62j 74r 89j 92w 104j 119w 121j 131b 148j 160r 163j 172w 38s 64v 93s 140v 150s") };
   } },
   { name: "El laboratorio", theme: "lab", build() {
     fill(0, COLS - 1, 0, 1, "#"); fill(0, COLS - 1, 13, 14, "#");
@@ -80,7 +80,7 @@ const LEVELS = [
     plat(35, 10, 3); coins(35, 9, 3); plat(71, 10, 4); coins(71, 9, 4); plat(111, 10, 2); plat(114, 8, 2); coins(114, 7, 2); plat(151, 10, 4); coins(151, 9, 4);
     plat(26, 8, 3, "?"); plat(80, 8, 3, "?"); plat(160, 8, 3, "?"); plat(50, 9, 3); coins(50, 8, 3);
     set(81, 8, "S"); set(27, 8, "O");
-    return { goal: 185, spawns: S("16w 28r 48b 66w 78r 86j 96w 105b 124r 133w 146b 158r 163j 175b 180r") };
+    return { goal: 185, spawns: S("16w 28r 48b 66w 78r 86j 96w 105b 124r 133w 146b 158r 163j 175b 180r 40e 74v 118s 160e 172v") };
   } },
   { name: "La guarida del Rey Zombi", theme: "lair", boss: true, build() {
     fill(0, COLS - 1, 13, 14, "#");
@@ -93,7 +93,7 @@ const LEVELS = [
     plat(26, 9, 4); coins(26, 8, 4); plat(58, 8, 3, "?"); plat(84, 6, 4); coins(84, 5, 4); plat(96, 9, 3, "?"); plat(122, 6, 3); coins(122, 5, 3); plat(138, 8, 4); coins(138, 7, 4);
     plat(165, 9, 3); plat(176, 7, 3, "?");
     set(59, 8, "S"); set(177, 7, "S"); set(97, 9, "O");
-    return { goal: 186, spawns: S("12w 25r 30j 42b 48r 59w 64j 75w 87r 98b 104j 124r 134b 141j 154r 178B") };
+    return { goal: 186, spawns: S("12w 25r 30j 42b 48r 59w 64j 75w 87r 98b 104j 124r 134b 141j 154r 178B 20v 50e 70v 133s 139e 146v") };
   } },
 ];
 
@@ -105,10 +105,13 @@ const ZT = {
   jumper: { w: 12, h: 14, hp: 1, speed: .5, pts: 150 },
   brute: { w: 16, h: 20, hp: 3, speed: .28, pts: 300 },
   boss: { w: 28, h: 36, hp: 12, speed: .55, pts: 2000 },
+  bat: { w: 12, h: 8, hp: 1, speed: .7, pts: 120 },       // murciélago zombi: vuela en onda y baja hacia vos
+  spitter: { w: 12, h: 14, hp: 2, speed: .2, pts: 200 },  // escupidor: tira ácido en arco desde lejos
+  shielder: { w: 12, h: 14, hp: 1, speed: .35, pts: 200 }, // escudero: el rayo no lo pasa de frente (salvo bestia x2)
 };
 let bossCheck = null; // punto de control en la arena del jefe: si perdés ahí, volvés directo al jefe
 let mode = "title", levelIdx = 0, L, TH, goalX = 184, levelStart = 0, banner = 0, bossDead = false, arenaLocked = false, deco = [];
-let player, zombies, items, parts, cam = 0, score = 0, lives = 3, brains = 0, time = 0, msg = "", msgT = 0, shake = 0, unlocked = 1;
+let shots = [], player, zombies, items, parts, cam = 0, score = 0, lives = 3, brains = 0, time = 0, msg = "", msgT = 0, shake = 0, unlocked = 1;
 try { unlocked = Math.max(1, Math.min(LEVELS.length, +localStorage.getItem("zombilandia-nivel") || 1)); } catch {}
 const urlLevel = Math.max(1, Math.min(LEVELS.length, +new URLSearchParams(location.search).get("nivel") || 0)) || 0;
 if (urlLevel) unlocked = Math.max(unlocked, urlLevel);
@@ -124,7 +127,11 @@ function loadLevel(i) {
   const info = L.build(); goalX = info.goal;
   player = { x: 40, y: 150, vx: 0, vy: 0, w: 10, h: 14, face: 1, ground: false, coyote: 0, jumps: 0, cd: 0, beam: 0, beamDir: 1, ray: null, firePrev: false, shot: 0, inv: 0, dead: 0, step: 0, springT: 0, big: false, tier: 0, want: keep, growing: keep > 0, power: keep > 0 ? 1 : 0, beamBig: false, beamTier: 0, shield: keepShield, safe: { x: 40, y: 150 } };
   zombies = [];
-  info.spawns.forEach(([col, type], n) => { const r = surface(col), k = ZT[type]; if (r > 0) zombies.push(makeZombie(col * T + (T - k.w) / 2, r * T - k.h, type, n)); });
+  info.spawns.forEach(([col, type], n) => {
+    const r = surface(col), k = ZT[type], x = col * T + (T - k.w) / 2;
+    if (type === "bat") { const z = makeZombie(x, (r > 0 ? r - 5 : 8) * T, type, n); z.bx = z.x; z.by = z.y; z.off = 0; zombies.push(z); }
+    else if (r > 0) zombies.push(makeZombie(x, r * T - k.h, type, n));
+  });
   items = [];
   for (let y = 0; y < ROWS; y++) for (let x = 0; x < COLS; x++) if (map[y][x] === "c") items.push({ x: x * T + 4, y: y * T + 4, w: 8, h: 8, got: false });
   totalBrains = items.length + map.reduce((n, row) => n + row.filter((c) => c === "?").length, 0); gotBrains = 0; levelTime = 0; damaged = false;
@@ -134,7 +141,7 @@ function loadLevel(i) {
     if (map[r][x - 1] === "^" || map[r][x + 1] === "^" || map[r - 1][x - 1] === "^" || map[r - 1][x + 1] === "^" || map[r - 1][x - 1] === "x" || map[r - 1][x + 1] === "x") continue;
     const q = rnd(x * 3.1 + i * 13); if (q < .36) deco.push([x, r - 1, TH.deco[Math.floor(rnd(x + i) * TH.deco.length)]]);
   }
-  parts = []; cam = 0; shake = 0; msg = ""; msgT = 0; banner = 160; bossDead = false; arenaLocked = false; levelStart = score;
+  parts = []; shots = []; cam = 0; shake = 0; msg = ""; msgT = 0; banner = 160; bossDead = false; arenaLocked = false; levelStart = score;
   if (i + 1 > unlocked) { unlocked = i + 1; try { localStorage.setItem("zombilandia-nivel", unlocked); } catch {} }
 }
 function lockArena() { arenaLocked = true; fill(155, 156, 2, 12, "#"); shake = 20; beep(90, .8, "sawtooth", 40); }
@@ -400,6 +407,17 @@ function updateZombie(z, p) {
   z.t++; if (z.flash) z.flash--;
   if (z.type === "runner" && Math.abs(dx) < 150 && Math.abs(p.y - z.y) < 40) z.vx = (Math.sign(dx) || 1) * 1.3;
   if (z.type === "jumper" && z.ground && z.t % 90 === 0) { z.vy = -4.8; z.vx = Math.abs(dx) < 160 ? Math.sign(dx) * .8 : z.vx; }
+  if (z.type === "bat") { // vuela: no usa gravedad ni choca con el piso
+    const near = Math.abs(dx) < 150 && p.y > z.by - 30;
+    z.vx = near ? Math.sign(dx) * 1.1 || z.vx : Math.abs(z.x - z.bx) > 56 ? -Math.sign(z.x - z.bx) * .7 : z.vx;
+    z.x += z.vx; z.off += ((near ? Math.min(70, p.y - z.by) : 0) - z.off) * .03; z.y = z.by + z.off + Math.sin(z.t * .08) * 10; z.step += .1;
+    if (!p.dead && hit(p, z)) { if (p.vy > 0.5 && p.y + p.h - z.y < 8) { damage(z, 1 + p.tier); p.vy = keys.jump ? -5.8 : -3.8; p.jumps = 1; } else hurt(z); }
+    return;
+  }
+  if (z.type === "spitter" && Math.abs(dx) < 230 && z.t % 120 === 0) {
+    shots.push({ x: z.x + 6, y: z.y + 5, vx: Math.max(-3.2, Math.min(3.2, dx / 55)), vy: -3.6, g: .15, r: 3, col: "#b6f03a", life: 240 }); beep(240, .15, "sawtooth", 120);
+  }
+  if (z.type === "shielder" && Math.abs(dx) < 170 && z.ground) z.vx = (Math.sign(dx) || 1) * .45;
   if (boss) {
     const sp = z.hp < 6 ? .95 : .55;
     if (Math.abs(dx) > 6) z.vx = Math.sign(dx) * sp;
@@ -461,8 +479,16 @@ function update() {
     p.ray = { x: d > 0 ? x0 : x0 - len, y: y - (th >> 1), w: len, h: th };
     if (time % 2 === 0) burst(x0 + d * len, y, ["#bff8ff", "#ffd84a", "#ff9ae0"][p.beamTier], 2 + p.beamTier * 2);
     const zone = { x: p.ray.x, y: p.ray.y, w: p.ray.w, h: p.ray.h + [0, 6, 16][p.beamTier] }; // de grande el rayo también alcanza a los zombis chicos
-    for (const z of zombies) if (!z.dead && z.shot !== p.shot && hit(zone, z)) { z.shot = p.shot; damage(z, TIER.dmg[p.beamTier]); }
-  } else p.ray = null;
+    p.zone = zone;
+    for (const z of zombies) if (!z.dead && z.shot !== p.shot && hit(zone, z)) {
+      z.shot = p.shot;
+      if (z.type === "shielder" && !z.broken && d === -(Math.sign(z.vx) || 1)) { // de frente, el escudo frena el rayo
+        if (p.beamTier < 2) { burst(z.x + (d > 0 ? 0 : 12), z.y + 7, "#e8eef5", 8); beep(1200, .06, "square"); continue; }
+        z.broken = true; burst(z.x + 6, z.y + 7, "#9aa4b4", 12);
+      }
+      damage(z, TIER.dmg[p.beamTier]);
+    }
+  } else { p.ray = null; p.zone = null; }
   if (p.ground && Math.abs(p.vx) > .3) p.step += Math.abs(p.vx) * .12;
   if (p.inv > 0) p.inv--;
   if (touching(p, "x", 2)) { if (p.vy >= 0) p.vy = -4.5; hurt(null); }
@@ -473,6 +499,14 @@ function update() {
     lockArena(); say("¡Apareció el Rey Zombi!"); bossCheck = { score, brains, level: levelIdx };
   }
   for (let i = 0; i < zombies.length; i++) updateZombie(zombies[i], p);
+  for (const s of shots) { // ácido de los escupidores
+    s.vy += s.g; s.x += s.vx; s.y += s.vy; s.life--;
+    const box = { x: s.x - s.r, y: s.y - s.r, w: s.r * 2, h: s.r * 2 };
+    if (solid(Math.floor(s.x / T), Math.floor(s.y / T)) || s.y > ROWS * T) { s.life = 0; burst(s.x, s.y, s.col, 5); }
+    else if (p.zone && hit(box, p.zone)) { s.life = 0; burst(s.x, s.y, "#bff8ff", 5); }
+    else if (!p.dead && hit(box, p)) { s.life = 0; burst(s.x, s.y, s.col, 6); hurt({ x: s.x, w: 0, type: "shot" }); }
+  }
+  shots = shots.filter((s) => s.life > 0);
   if (mode !== "play") return;
   for (const it of items) if (!it.got && hit(p, it) && it.kind === "syringe") { it.got = true; powerUp(); }
   for (const it of items) if (!it.got && hit(p, it) && it.kind === "shield") { it.got = true; p.shield = true; say("¡Escudo!"); beep(440, .3, "triangle", 880); vibe(40); }
@@ -753,6 +787,7 @@ function drawSmall(z, i, x, y, f, s) {
   let sk, skd, sh;
   if (z.type === "runner") { sk = "#c8a878"; skd = "#9a7650"; sh = "#a02a2a"; }
   else if (z.type === "jumper") { sk = "#a88ac8"; skd = "#76589a"; sh = "#2a4a3a"; }
+  else if (z.type === "spitter") { sk = "#b8c050"; skd = "#8a9030"; sh = "#5a4a2a"; }
   else { [sk, skd] = ZSKIN[i % 3]; sh = ZSHIRT[(i >> 1) % 3]; }
   const crouch = z.type === "jumper" && z.ground && z.t % 90 > 70 ? 2 : 0, lean = z.type === "runner" ? f : 0;
   y += crouch;
@@ -766,6 +801,21 @@ function drawSmall(z, i, x, y, f, s) {
   R(ex, y + 2, 3, 2, "#1a1010"); R(ex + 1, y + 2, 1, 1, eye); R(f > 0 ? hx + 3 : hx + 7, y + 2, 2, 2, "#1a1010");
   R(hx + (f > 0 ? 4 : 3), y + 5, 5, 1, "#2a1a1a"); R(hx + (f > 0 ? 5 : 4), y + 5, 1, 1, "#eee"); R(hx + (f > 0 ? 7 : 6), y + 5, 1, 1, "#eee");
   if (z.type === "jumper") R(f > 0 ? hx + 10 : hx, y + 5 + (Math.sin(time * .2 + i) > 0 ? 1 : 0), 2, 1, "#e06080");
+  if (z.type === "spitter") { // panza hinchada y boca abierta antes de escupir
+    R(x + 1, y + 8, 10, 4, "#c8d060"); R(x + 3, y + 9, 2, 1, "#e8f080");
+    if (z.t % 120 > 96) { R(hx + (f > 0 ? 6 : 2), y + 4, 4, 3, "#1a1010"); R(hx + (f > 0 ? 7 : 3), y + 7, 1, 2, "#b6f03a"); }
+  }
+  if (z.type === "shielder") {
+    if (!z.broken) { const sx = f > 0 ? x + 11 : x - 3; R(sx, y + 3, 4, 11, "#6a7486"); R(sx + 1, y + 4, 2, 9, "#9aa4b4"); R(sx + 1, y + 4, 2, 1, "#e8eef5"); R(sx + 1, y + 8, 2, 1, "#4a5466"); }
+    else R(f > 0 ? x + 11 : x - 1, y + 9, 2, 3, "#6a7486");
+    R(hx + 2, y - 1, 8, 2, "#4a5466"); // casco
+  }
+}
+function drawBat(z, x, y, i) {
+  const up = Math.sin(time * .4 + i) > 0, c = "#4a2a5a", d = "#2e1a3a";
+  if (up) { R(x - 1, y - 2, 5, 2, d); R(x + 8, y - 2, 5, 2, d); R(x + 1, y, 3, 2, c); R(x + 8, y, 3, 2, c); }
+  else { R(x - 1, y + 4, 5, 2, d); R(x + 8, y + 4, 5, 2, d); R(x + 1, y + 2, 3, 2, c); R(x + 8, y + 2, 3, 2, c); }
+  R(x + 4, y + 1, 4, 6, c); R(x + 4, y, 1, 1, c); R(x + 7, y, 1, 1, c); R(x + 4, y + 2, 1, 1, "#ff3030"); R(x + 7, y + 2, 1, 1, "#ff3030"); R(x + 5, y + 5, 2, 1, "#e8e0d0"); R(x + 5, y + 6, 1, 2, "#7fbf5a");
 }
 function drawBrute(z, x, y, f, s) {
   const sk = "#7a9a6a", skd = "#4f6a44";
@@ -803,6 +853,7 @@ function drawZombie(z, i) {
   if (z.flash && (z.flash >> 1) % 2) g.globalAlpha = .35;
   if (z.type === "brute") drawBrute(z, x, y + bob, f, s);
   else if (z.type === "boss") drawBoss(z, x, y + bob, f, s);
+  else if (z.type === "bat") drawBat(z, x, y, i);
   else drawSmall(z, i, x, y + bob, f, s);
   g.globalAlpha = 1;
 }
@@ -910,6 +961,7 @@ function draw() {
   if (shake) g.translate(Math.round((Math.random() - .5) * 4), Math.round((Math.random() - .5) * 4));
   drawBg(); drawTiles(); drawItems();
   zombies.forEach((z, i) => drawZombie(z, z.idx ?? i));
+  for (const s of shots) { const x = s.x - cam; g.globalAlpha = .3; g.fillStyle = s.col; g.beginPath(); g.arc(x, s.y, s.r + 3, 0, 7); g.fill(); g.globalAlpha = 1; g.beginPath(); g.arc(x, s.y, s.r, 0, 7); g.fill(); R(x - 1, s.y - 2, 1, 1, "#f0ffc0"); }
   drawPlayer(); drawShield(); drawBeam();
   for (const q of parts) { g.globalAlpha = Math.min(1, q.life / 20); R(q.x - cam, q.y, 2, 2, q.col); } g.globalAlpha = 1;
   g.fillStyle = grads().vig; g.fillRect(0, 0, W, H);

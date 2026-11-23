@@ -5,6 +5,7 @@ Platformer de zombies para el navegador, hecho con canvas y sin librerías. Pers
 - **Jugar:** https://ccontarino.github.io/zombilandia/
 - **Controles:** ← → o A D para moverte, Espacio o ↑ para saltar (en el aire, de nuevo: doble salto), X, F o Shift para el rayo láser de ojos. En el celu, botones en pantalla.
 - **Súper poder:** el rayo láser atraviesa a todos los zombis en línea y se frena en las paredes. Tiene recarga corta (barra ⚡).
+- **Enemigos nuevos:** murciélagos zombis que bajan hacia vos, escupidores que tiran ácido en arco (el rayo deshace el ácido) y escuderos con un escudo que frena el rayo de frente: pisalos, pegales de espaldas o usá el modo bestia x2.
 - **Niveles:**
   1. **El cementerio:** tumbas, pozos y zombis lentos.
   2. **Ciudad en ruinas:** saltos entre techos, resortes y zombis corredores que te persiguen.
